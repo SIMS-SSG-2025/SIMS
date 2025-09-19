@@ -5,12 +5,13 @@ sqlconn = sqlite3.connect("events.db")
 cursor = sqlconn.cursor()
 timeslot = datetime.datetime.now()
 
-cursor.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, type TEXT, time TEXT)")
-cursor.execute("INSERT INTO events (type,time) VALUES (?, ?)", ("Filip",  f"{timeslot}"))
+cursor.execute("""CREATE TABLE IF NOT EXISTS events ( id INTEGER PRIMARY KEY AUTOINCREMENT,
+               type TEXT NOT NULL,
+time TEXT NOT NULL,
+has_helmet BOOLEAN,
+has_vest BOOLEAN, zone TEXT)""")
 
-cursor.execute("SELECT * from events")
 
-# print(cursor.fetchall())
 sqlconn.commit()
 sqlconn.close()
 
