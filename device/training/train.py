@@ -7,7 +7,7 @@ from ultralytics.nn.tasks import DetectionModel
 import argparse
 import yaml
 from types import SimpleNamespace
-
+import numpy as np
 from device.training.utils.loss import DetectionLoss
 
 parser = argparse.ArgumentParser()
@@ -87,11 +87,34 @@ criterion = DetectionLoss(model, hyp=loss_hyp)
 
 optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE)
 
-lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50, eta_min=0.0000001)
+lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=0.0000001)
+
+train_box_loss = []
+train_cls_loss = []
+train_dfl_loss = []
+
+val_box_loss = []
+val_cls_loss = []
+val_dfl_loss = []
+
 
 # Training loop
 
 for epoch in range(EPOCHS):
+
+    print(f'Epoch: {epoch+1}/{EPOCHS}')
+
+    training_loss = []
+    validation_loss = []
+
+    epoch_train_box = []
+    epoch_train_cls = []
+    epoch_train_dfl = []
+
+    epoch_val_box = []
+    epoch_val_cls = []
+    epoch_val_dfl = []
+
 
     model.train()
     for batch in train_loader:
@@ -110,6 +133,12 @@ for epoch in range(EPOCHS):
         optimizer.step()
         optimizer.zero_grad()
 
+        training_loss.append(loss.item())
+        epoch_train_box.append(loss_items[0].item())
+        epoch_train_cls.append(loss_items[1].item())
+        epoch_train_dfl.append(loss_items[2].item())
+
+
 
     lr_scheduler.step()
 
@@ -124,4 +153,26 @@ for epoch in range(EPOCHS):
             loss, loss_items = criterion(output, batch)
             loss = loss.sum()
 
+            validation_loss.append(loss.item())
+            epoch_val_box.append(loss_items[0].item())
+            epoch_val_cls.append(loss_items[1].item())
+            epoch_val_dfl.append(loss_items[2].item())
 
+
+    mean_train_loss = np.mean(training_loss)
+    mean_val_loss = np.mean(validation_loss)
+
+    mean_train_box = np.mean(epoch_train_box)
+    mean_train_cls = np.mean(epoch_train_cls)
+    mean_train_dfl = np.mean(epoch_train_dfl)
+
+    mean_val_box = np.mean(epoch_val_box)
+    mean_val_cls = np.mean(epoch_val_cls)
+    mean_val_dfl = np.mean(epoch_val_dfl)
+
+    print(
+        f"Training: total {mean_train_loss:.4f} "
+        f"(box {mean_train_box:.4f}, cls {mean_train_cls:.4f}, dfl {mean_train_dfl:.4f}) | "
+        f"Validation: total {mean_val_loss:.4f} "
+        f"(box {mean_val_box:.4f}, cls {mean_val_cls:.4f}, dfl {mean_val_dfl:.4f})"
+    )
