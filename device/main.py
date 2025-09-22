@@ -2,14 +2,16 @@ import cv2
 from ultralytics import YOLO
 import time
 
-from inference.inference import run_inference
-from inference.tracker import Tracker
+from device.inference.inference import run_inference
+from device.inference.tracker import Tracker
+from device.logic.events import EventManager
 
 
 cam = cv2.VideoCapture(0)
 model = YOLO("yolo11n.pt")
 class_names = model.names
 tracker = Tracker(class_names=class_names)
+event_manager = EventManager()
 prev_time = time.time()
 
 while True:
@@ -26,6 +28,7 @@ while True:
     detections_for_tracking = [d for d in detections if class_names[d[-1]] in trackable_classes]
     ppe_detections = [d for d in detections if class_names[d[-1]] in ppe_classes]
     tracked_objects = tracker.update(detections_for_tracking, frame)
+    event_manager.handle_detections(tracked_objects, ppe_detections)
     if tracked_objects is None:
         continue
     for obj in tracked_objects:

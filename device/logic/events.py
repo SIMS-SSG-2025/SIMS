@@ -1,8 +1,11 @@
+from backend.db.database_manager import DatabaseManager
+
 
 class EventManager:
     def __init__(self):
         self.active_tracks = []
         self.zones = []  # Predefined zones can be added here
+        self.database = DatabaseManager(db_path="events.db")
 
     def handle_detections(self, tracked_objects, ppe_detections):
         """
@@ -12,6 +15,8 @@ class EventManager:
         tracked_objects: {track_id: 1, bbox: [x, y, w, h], cls: "person"}
         ppe_detections: [{"bbox": [x, y, w, h], "class_id": "helmet", "score": 0.9}]
         """
+        if tracked_objects is None:
+            return
         for obj in tracked_objects:
             track_id = obj["track_id"]
 
@@ -24,7 +29,14 @@ class EventManager:
                         if self._is_overlapping(obj["bbox"], ppe["bbox"]):
                             obj["ppe"].append(ppe["class"])
 
-                self._create_event(obj)
+                self._create_object(obj)
+
+
+        self.active_tracks = [obj["track_id"] for obj in tracked_objects]
+
+
+
+
 
     def _is_overlapping(self, bbox1, bbox2):
         """
@@ -48,13 +60,12 @@ class EventManager:
         if x > 100 and y > 100:
             return True
         return False
-    def _create_event(self, obj):
-        """ Create an event in the database. """
-        event = {
+    def _create_object(self, obj):
+        """ Create an object in the database. """
+        object = {
             "track_id": obj["track_id"],
-            "class": obj["class"],
-            "ppe": obj.get("ppe", []),
-            "in_zone": self._check_zone(obj["bbox"])
+            "type": obj["class"],
         }
-        print(f"Event created: {event}")
-        # Here you would insert the event into your database
+        print(f"Object created: {object}")
+        # Here you would insert the object into your database
+        self.database.insert_object(object_id=object["track_id"], object_type=object["type"])
