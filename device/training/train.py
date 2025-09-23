@@ -8,7 +8,7 @@ import argparse
 import yaml
 from types import SimpleNamespace
 import numpy as np
-from device.training.utils.loss import DetectionLoss
+from utils.loss import DetectionLoss
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -27,13 +27,22 @@ TRAIN_IMAGES_DIR = config['data']['train']['images_dir']
 TRAIN_LABELS_DIR = config['data']['train']['labels_dir']
 TRAIN_BATCH_SIZE = config['data']['train']['batch_size']
 
-VALIDATION_IMAGES_DIR = config['data']['val']['images_dir']
-VALIDATION_LABELS_DIR = config['data']['val']['labels_dir']
-VALIDATION_BATCH_SIZE = config['data']['val']['batch_size']
+VALIDATION_IMAGES_DIR = config['data']['valid']['images_dir']
+VALIDATION_LABELS_DIR = config['data']['valid']['labels_dir']
+VALIDATION_BATCH_SIZE = config['data']['valid']['batch_size']
 
 LEARNING_RATE = config['training']['optimizer']['lr']
 EPOCHS = config['training']['epochs']
 DEVICE = config['training']['device']
+
+if DEVICE == "cuda:0":
+    DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+else:
+    DEVICE = "cpu"
+
+BASE_MODEL = config['model']['base_model']
+MODEL_CHECKPOINT = config['model']['model_checkpoint']
+MODEL_CONFIG = config['model']['model_config']
 
 print(LEARNING_RATE)
 
@@ -65,12 +74,20 @@ val_loader = DataLoader(
 
 # Load model
 
-# add continue from checkpoint...
-model_checkpoint = torch.load("../inference/yolo11s.pt")
-model_config = model_checkpoint['model'].yaml
+if config["training"]["train_from_checkpoint"]:
+    with open(MODEL_CONFIG, 'r') as file:
+        model_config = yaml.safe_load(file)
+    num_classes = model_config["nc"]
+    model = DetectionModel(cfg=model_config, nc=num_classes)
+    model.load_state_dict(torch.load(MODEL_CHECKPOINT, map_location=lambda storage, loc: storage))
+    print("continue from checkpoint")
+else:
+    model_checkpoint = torch.load(BASE_MODEL)
+    model_config = model_checkpoint['model'].yaml
+    model = DetectionModel(cfg=model_config, nc=10, verbose=True)
+    model.load(model_checkpoint)
+    print("base model")
 
-model = DetectionModel(cfg=model_config, nc=10, verbose=True)
-model.load(model_checkpoint)
 
 model = model.to(DEVICE)
 
@@ -176,3 +193,6 @@ for epoch in range(EPOCHS):
         f"Validation: total {mean_val_loss:.4f} "
         f"(box {mean_val_box:.4f}, cls {mean_val_cls:.4f}, dfl {mean_val_dfl:.4f})"
     )
+
+# TODO: add early stopping
+torch.save(model.state_dict(), "yolo11_ppe_best.pth")
