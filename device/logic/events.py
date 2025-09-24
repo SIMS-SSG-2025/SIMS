@@ -1,4 +1,5 @@
 from backend.db.database_manager import DatabaseManager
+import datetime
 
 
 class EventManager:
@@ -30,6 +31,7 @@ class EventManager:
                             obj["ppe"].append(ppe["class"])
 
                 self._create_object(obj)
+
 
 
         self.active_tracks = [obj["track_id"] for obj in tracked_objects]
@@ -69,3 +71,25 @@ class EventManager:
         print(f"Object created: {object}")
         # Here you would insert the object into your database
         self.database.insert_object(object_id=object["track_id"], object_type=object["type"])
+
+    def _create_event(self, obj):
+        """ Create an event in the database. """
+
+        event = {
+            "object_id": obj["track_id"],
+            "zone_id": None,
+            "location": "lager1",
+            "helmet": True if "helmet" in obj.get("ppe", []) else False,
+            "vest": True if "vest" in obj.get("ppe", []) else False,
+            "time": datetime.datetime.now().isoformat(),
+        }
+        print(f"Event created: {event}")
+        # Here you would insert the event into your database
+        self.database.insert_events(
+            object_id=event["object_id"],
+            zone_id=event["zone_id"],
+            location=event["location"],
+            helmet=event["helmet"],
+            vest=event["vest"],
+            time=event["time"]
+        )
