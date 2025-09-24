@@ -1,7 +1,8 @@
 <script lang="ts">
+    import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
     import { onMount } from "svelte";
 
-    type Event = {
+   /*  type Event = {
         message: string;
     };
 
@@ -14,10 +15,10 @@
 
     onMount(() => {
         loadEvents();
-    });
+    });  */
 </script>
 
-<h1>Events</h1>
+<!-- <h1>Events</h1>
 
 {#if events.length > 0}
     <ul>
@@ -29,4 +30,8 @@
     </ul>
 {:else}
     <p>No events yet</p>
-{/if}
+{/if} -->
+
+<h1>Draw forbidden zones</h1>
+
+<ZoneDrawer />
