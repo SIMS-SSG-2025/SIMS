@@ -38,4 +38,4 @@ def letterbox(img, boxes=None, new_shape=(640, 640), normalized=True):
             boxes[:, 2] /= new_shape[1]
             boxes[:, 3] /= new_shape[0]
 
-    return img_padded, boxes
+    return img_padded, boxes, (ratio, dw, dh)
