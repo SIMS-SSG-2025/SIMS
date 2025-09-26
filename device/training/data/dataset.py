@@ -42,7 +42,7 @@ class SafetyDataset(Dataset):
             classes = np.array([], dtype=np.float32)
             boxes = np.zeros((0, 4), dtype=np.float32)
 
-        img_padded, boxes = letterbox(img, boxes, new_shape=(self.img_size, self.img_size), normalized=True)
+        img_padded, boxes, _ = letterbox(img, boxes, new_shape=(self.img_size, self.img_size), normalized=True)
 
         img_tensor = torch.from_numpy(img_padded).permute(2, 0, 1).float() / 255.0
         assert img_tensor.shape == (3, 640, 640), f"Got {img_tensor.shape}"
