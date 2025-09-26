@@ -26,4 +26,4 @@ class Tracker:
                 "class": class_name
             })
 
-            return tracked_objects
+        return tracked_objects

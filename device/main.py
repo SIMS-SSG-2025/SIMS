@@ -9,6 +9,11 @@ from device.logic.events import EventManager
 import multiprocessing
 from multiprocessing import Process, Queue, Event
 
+import yaml
+from ultralytics.nn.tasks import DetectionModel
+import torch
+from device.training.dataset.dataset_transform import load_class_mapping
+
 def capture_process(queue, stop_event):
     print("Capture process started.")
     cam = cv2.VideoCapture(0)
@@ -39,7 +44,8 @@ def event_process(detection_queue, visualization_queue, stop_event, tracker, eve
     while not stop_event.is_set():
         if not detection_queue.empty():
             detections, frame = detection_queue.get()
-            trackable_classes = ["person", "vehicle"]
+            print(detections)
+            trackable_classes = ["Person", "vehicle", "Hardhat", "NO-Hardhat"]
             ppe_classes = ["helmet", "vest"]
             detections_for_tracking = [d for d in detections if class_names[d[-1]] in trackable_classes]
             ppe_detections = [d for d in detections if class_names[d[-1]] in ppe_classes]
@@ -49,11 +55,16 @@ def event_process(detection_queue, visualization_queue, stop_event, tracker, eve
                 continue
             for obj in tracked_objects:
                 # Visualization
-                x, y, w, h = obj["bbox"]
+                bbox = obj["bbox"]
+                cx, cy, w, h = bbox
+                x1 = int(cx - w / 2)
+                y1 = int(cy - h / 2)
+                x2 = int(cx + w / 2)
+                y2 = int(cy + h / 2)
                 cls_name = obj["class"]
                 track_id = obj["track_id"]
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                cv2.putText(frame, f"Track ID: {track_id} Detected: {cls_name}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, f"Track ID: {track_id} Detected: {cls_name}", (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
             if not visualization_queue.full():
                 visualization_queue.put(frame)
@@ -63,8 +74,22 @@ def event_process(detection_queue, visualization_queue, stop_event, tracker, eve
 
 if __name__ == "__main__":
     multiprocessing.set_start_method('spawn') # Windows specific
-    model = YOLO("yolo11n.pt")
-    class_names = model.names
+
+    model_config = "device/training/models/yolo11_ppe_cfg.yaml"
+    model_path = "device/training/models/yolo_ppe.pth"
+    with open(model_config, 'r') as file:
+        model_config = yaml.safe_load(file)
+
+
+    num_classes = model_config["nc"]
+    model = DetectionModel(cfg=model_config, nc=num_classes)
+    model.load_state_dict(torch.load(model_path, map_location=lambda storage, loc: storage))
+    #model_checkpoint = torch.load(model_path)
+    #model.load(model_checkpoint)
+    model.eval()
+    class_names = load_class_mapping("device/training/dataset/safety_dataset_filtered.yaml")
+    print(class_names)
+
     tracker = Tracker(class_names=class_names)
     event_manager = EventManager()
     prev_time = time.time()
@@ -126,6 +151,8 @@ if __name__ == "__main__":
 
 
 
+
+
 """ while True:
     ret, frame = cam.read()
     current_time = time.time()
@@ -138,7 +165,9 @@ if __name__ == "__main__":
     print(detections)
     trackable_classes = ["person", "vehicle"]
     ppe_classes = ["helmet", "vest"]
+    # Jämför format på detections
     detections_for_tracking = [d for d in detections if class_names[d[-1]] in trackable_classes]
+    print(f"det for tracking: {detections_for_tracking}")
     ppe_detections = [d for d in detections if class_names[d[-1]] in ppe_classes]
     tracked_objects = tracker.update(detections_for_tracking, frame)
     #event_manager.handle_detections(tracked_objects, ppe_detections)
@@ -146,11 +175,16 @@ if __name__ == "__main__":
         continue
     for obj in tracked_objects:
         # Visualization
-        x, y, w, h = obj["bbox"]
+        bbox = obj["bbox"]
+        cx, cy, w, h = bbox
+        x1 = int(cx - w / 2)
+        y1 = int(cy - h / 2)
+        x2 = int(cx + w / 2)
+        y2 = int(cy + h / 2)
         cls_name = obj["class"]
         track_id = obj["track_id"]
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-        cv2.putText(frame, f"Track ID: {track_id} Detected: {cls_name} FPS: {fps:.0f}", (x, y+20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(frame, f"Track ID: {track_id} Detected: {cls_name} FPS: {fps:.0f}", (x1, y1+20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
     cv2.imshow('Camera feed', frame)
 
