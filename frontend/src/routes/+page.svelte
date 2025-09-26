@@ -12,7 +12,7 @@
         loading = true;
         error = null;
         try {
-            const response = await fetch("http://10.10.67.45:8000/snapshot");
+            const response = await fetch("http://10.10.67.44:8000/snapshot");
             if (!response.ok) {
                 throw new Error(`Error fetching snapshot: ${response.statusText}`);
             }

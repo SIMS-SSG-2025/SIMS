@@ -69,7 +69,6 @@ class EventManager:
             "type": obj["class"],
         }
         print(f"Object created: {object}")
-        # Here you would insert the object into your database
         self.database.insert_object(object_id=object["track_id"], object_type=object["type"])
 
     def _create_event(self, obj):
@@ -84,7 +83,6 @@ class EventManager:
             "time": datetime.datetime.now().isoformat(),
         }
         print(f"Event created: {event}")
-        # Here you would insert the event into your database
         self.database.insert_events(
             object_id=event["object_id"],
             zone_id=event["zone_id"],
