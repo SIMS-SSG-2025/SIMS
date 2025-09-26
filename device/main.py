@@ -22,6 +22,7 @@ def capture_process(queue, stop_event):
         time.sleep(0.01)
 
     cam.release()
+    print("Capture process exited.")
 
 def inference_process(queue, detection_queue, stop_event, model):
     print("Inference process started.")
@@ -30,7 +31,7 @@ def inference_process(queue, detection_queue, stop_event, model):
             frame = queue.get()
             detections = run_inference(frame, model)
             detection_queue.put((detections, frame))
-
+    print("Inference process exited.")
 
 
 def event_process(detection_queue, visualization_queue, stop_event, tracker, event_manager, class_names):
@@ -100,7 +101,6 @@ if __name__ == "__main__":
             p.join(timeout=2)
             if p.is_alive():
                 p.terminate()
-                print(f"Terminated process {p.name}")
                 p.join()
 
     except KeyboardInterrupt:
@@ -110,7 +110,6 @@ if __name__ == "__main__":
             p.join(timeout=2)
             if p.is_alive():
                 p.terminate()
-                print(f"Terminated process {p.name}")
                 p.join()
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -119,7 +118,6 @@ if __name__ == "__main__":
             p.join(timeout=2)
             if p.is_alive():
                 p.terminate()
-                print(f"Terminated process {p.name}")
                 p.join()
     finally:
         cv2.destroyAllWindows()
