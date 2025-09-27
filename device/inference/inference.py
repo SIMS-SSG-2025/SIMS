@@ -8,8 +8,8 @@ def post_process(output, letterbox_info):
     ratio, dw, dh = letterbox_info
     nms_results = non_max_suppression(
             output[0],
-            conf_thres=0.7,
-            iou_thres=0.8,
+            conf_thres=0.2,
+            iou_thres=0.5,
             max_det=1000
         )
 
@@ -17,10 +17,10 @@ def post_process(output, letterbox_info):
     if len(nms_results[0]) > 0:
         for pred in nms_results[0]:
             # undo letterboxing
-            pred[0] = (pred[0] - dw) / ratio  # x1
-            pred[1] = (pred[1] - dh) / ratio  # y1
-            pred[2] = (pred[2] - dw) / ratio  # x2
-            pred[3] = (pred[3] - dh) / ratio  # y2
+            pred[0] = (pred[0] - dw) / ratio
+            pred[1] = (pred[1] - dh) / ratio
+            pred[2] = (pred[2] - dw) / ratio
+            pred[3] = (pred[3] - dh) / ratio
             bbox = xyxy2xywh(pred[:4].unsqueeze(0))[0].cpu().numpy().tolist()
             conf = pred[4].item()
             cls = int(pred[5].item())
