@@ -16,7 +16,6 @@ def build_trt(onnx_path, trt_path, fp16=True):
         f"--onnx={onnx_path}",
         f"--saveEngine={trt_path}",
         "--explicitBatch",
-        "--fp16",
         "--workspace=512",
     ]
     if fp16:
