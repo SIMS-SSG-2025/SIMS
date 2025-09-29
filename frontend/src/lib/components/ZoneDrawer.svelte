@@ -5,15 +5,15 @@
         x: number;
         y: number;
     }
-    let canvas;
-    let ctx;
-    let img;
-    let drawing = false;
+    let canvas: HTMLCanvasElement;
+    let ctx: CanvasRenderingContext2D;
+    let img: HTMLImageElement;
+    let drawing: boolean = false;
     let points: Point[] = [];
     let draggingPointsIndex: number | null = null;
 
     onMount(() => {
-        ctx = canvas.getContext("2d");
+        ctx = canvas.getContext("2d")!;
         img = new Image();
         img.src = "/snapshot.jpg";
         img.onload = () => {
@@ -23,7 +23,7 @@
         };
     })
 
-    function getMousePos(event) {
+    function getMousePos(event: MouseEvent): Point {
         const rect = canvas.getBoundingClientRect();
         return {
             x: event.clientX - rect.left,
@@ -31,11 +31,11 @@
         };
     }
 
-    function findPointIndex(pos) {
+    function findPointIndex(pos: Point): number {
         return points.findIndex((pt) => Math.hypot(pt.x - pos.x, pt.y - pos.y) < 6);
     }
 
-    function handleMouseDown(event) {
+    function handleMouseDown(event: MouseEvent): void {
         const pos = getMousePos(event);
         const idx = findPointIndex(pos);
         if (idx !== -1) {
@@ -43,7 +43,7 @@
         }
     }
 
-    function handleMouseMove(event) {
+    function handleMouseMove(event: MouseEvent): void {
         if (draggingPointsIndex !== null) {
             const pos = getMousePos(event);
             points[draggingPointsIndex] = pos;
@@ -51,7 +51,7 @@
         }
     }
 
-    function handleMouseUp() {
+    function handleMouseUp(): void {
         if (draggingPointsIndex !== null) {
             points = orderPolygonPoints(points);
             redraw();
@@ -59,7 +59,7 @@
         draggingPointsIndex = null;
     }
 
-    function handleClick(event) {
+    function handleClick(event: MouseEvent): void {
         const pos = getMousePos(event);
         // Only add a point if not clicking on an existing point
         if (findPointIndex(pos) !== -1) return;
@@ -72,13 +72,13 @@
         redraw();
     }
 
-    function handleUndo() {
+    function handleUndo(): void {
         points.pop();
         console.log(points);
         redraw();
     }
 
-    function handleFinish() {
+    function handleFinish(): void {
         if(points.length > 2) {
             // Here you would typically send the points to the backend
             const normalizedPoints = points.map(p => ({
@@ -105,7 +105,7 @@
         });
     }
 
-    function redraw() {
+    function redraw(): void {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
 
@@ -150,5 +150,4 @@
     on:mousemove={handleMouseMove}
     on:mouseup={handleMouseUp}
     style="border:1px solid #ccc; cursor: crosshair;"
-
-/>
+></canvas>
