@@ -9,7 +9,7 @@ import yaml
 from ultralytics.nn.tasks import DetectionModel
 import torch
 from training.dataset.dataset_transform import load_class_mapping
-
+from utils.logger import get_logger
 
 cam = cv2.VideoCapture(0)
 model_config = "./training/models/yolo11_ppe_cfg.yaml"
@@ -33,8 +33,9 @@ model.eval()
 #class_names = model.names
 class_names = load_class_mapping("training/dataset/safety_dataset_filtered.yaml")
 print(class_names)
+logger = get_logger("Inference")
 tracker = Tracker(class_names=class_names)
-event_manager = EventManager()
+event_manager = EventManager(logger=logger)
 prev_time = time.time()
 
 while True:
@@ -46,16 +47,15 @@ while True:
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     detections = run_inference(rgb_frame, model)
-    print(detections)
-    trackable_classes = ["Person", "vehicle", "Hardhat", "NO-Hardhat"]
+    #trackable_classes = ["Person", "vehicle", "Hardhat", "NO-Hardhat"]
+    trackable_classes = ["Person", "vehicle"]
     ppe_classes = ["helmet", "vest"]
     # Jämför format på detections
     detections_for_tracking = [d for d in detections if class_names[d[-1]] in trackable_classes]
-    print(f"det for tracking: {detections_for_tracking}")
     ppe_detections = [d for d in detections if class_names[d[-1]] in ppe_classes]
     tracked_objects = tracker.update(detections_for_tracking, frame)
 
-    #event_manager.handle_detections(tracked_objects, ppe_detections)
+    event_manager.handle_detections(tracked_objects, ppe_detections)
     if tracked_objects is None:
         continue
     for obj in tracked_objects:

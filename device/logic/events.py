@@ -3,10 +3,11 @@ import datetime
 
 
 class EventManager:
-    def __init__(self):
+    def __init__(self, logger):
         self.active_tracks = []
         self.zones = []  # Predefined zones can be added here
         self.database = DatabaseManager(db_path="events.db")
+        self.logger = logger
 
     def handle_detections(self, tracked_objects, ppe_detections):
         """
@@ -69,8 +70,8 @@ class EventManager:
             "type": obj["class"],
         }
         print(f"Object created: {object}")
-        # Here you would insert the object into your database
-        self.database.insert_object(object_id=object["track_id"], object_type=object["type"])
+        self.logger.info(f"[DB] Object created: {object}")
+        #self.database.insert_object(object_id=object["track_id"], object_type=object["type"])
 
     def _create_event(self, obj):
         """ Create an event in the database. """
@@ -84,12 +85,12 @@ class EventManager:
             "time": datetime.datetime.now().isoformat(),
         }
         print(f"Event created: {event}")
-        # Here you would insert the event into your database
-        self.database.insert_events(
-            object_id=event["object_id"],
-            zone_id=event["zone_id"],
-            location=event["location"],
-            helmet=event["helmet"],
-            vest=event["vest"],
-            time=event["time"]
-        )
+        self.logger.info(f"[DB] Event created: {event}")
+        #self.database.insert_events(
+        #    object_id=event["object_id"],
+        #    zone_id=event["zone_id"],
+        #    location=event["location"],
+        #    has_helmet=event["helmet"],
+        #    has_vest=event["vest"],
+        #    time=event["time"]
+        #)
