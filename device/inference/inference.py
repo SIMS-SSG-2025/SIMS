@@ -1,13 +1,12 @@
 from device.training.data.transforms import letterbox
 import torch
 from ultralytics.utils.ops import non_max_suppression, xyxy2xywh
-
-
+import time
 
 def post_process(output, letterbox_info):
     ratio, dw, dh = letterbox_info
     nms_results = non_max_suppression(
-            output[0],
+            output,
             conf_thres=0.2,
             iou_thres=0.5,
             max_det=1000
@@ -35,11 +34,15 @@ def pre_process(frame):
     return img_tensor, letterbox_info
 
 
-def run_inference(frame, model):
+def run_inference(frame, session):
     img_tensor, letterbox_info = pre_process(frame)
-    with torch.no_grad():
-        output = model.forward(img_tensor)
+    img_numpy = img_tensor.cpu().numpy()
 
-    return post_process(output, letterbox_info)
+    input_name = session.get_inputs()[0].name
+    output_name = session.get_outputs()[0].name
+    preds = session.run([output_name], {input_name: img_numpy})
+    output_tensor = torch.from_numpy(preds[0])
+
+    return post_process(output_tensor, letterbox_info)
 
 

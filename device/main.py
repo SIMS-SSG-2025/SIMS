@@ -2,7 +2,7 @@ import cv2
 import time
 
 import numpy as np
-from django.db.models.expressions import result
+
 
 from inference.inference import run_inference
 from inference.tracker import Tracker
@@ -11,6 +11,7 @@ import yaml
 from ultralytics.nn.tasks import DetectionModel
 import torch
 from training.dataset.dataset_transform import load_class_mapping
+import onnxruntime as ort
 
 class DetectionResults:
     def __init__(self, dets):
@@ -35,22 +36,13 @@ class DetectionResults:
 cam = cv2.VideoCapture(0)
 cam_fps = cam.get(cv2.CAP_PROP_FPS)
 print(f"Cam FPS: {cam_fps}")
-model_config = "./training/models/yolo11_ppe_cfg.yaml"
-model_path = "./training/models/yolo_ppe.pth"
 
-#model_config = "./training/models/yolo11s.yaml"
-#model_path = "./training/models/yolo11s.pt"
-
-with open(model_config, 'r') as file:
-    model_config = yaml.safe_load(file)
+onnx_model_path = "training/models/yolo_ppe.onnx"
+session = ort.InferenceSession(onnx_model_path)
 
 
-num_classes = model_config["nc"]
-model = DetectionModel(cfg=model_config, nc=num_classes)
-model.load_state_dict(torch.load(model_path, map_location=lambda storage, loc: storage))
-#model_checkpoint = torch.load(model_path)
-#model.load(model_checkpoint)
-model.eval()
+print("Inputs:", [i.name for i in session.get_inputs()])
+print("Outputs:", [o.name for o in session.get_outputs()])
 
 
 #class_names = model.names
@@ -68,7 +60,8 @@ while True:
 
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-    detections = run_inference(rgb_frame, model)
+    detections = run_inference(rgb_frame, session)
+
     trackable_classes = ["Person", "vehicle", "Hardhat", "NO-Hardhat"]
     ppe_classes = ["helmet", "vest"]
     detections_for_tracking = [d for d in detections if class_names[d[-1]] in trackable_classes]

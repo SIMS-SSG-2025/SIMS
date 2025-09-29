@@ -6,7 +6,7 @@ import subprocess
 
 def export_onnx(model, dummy_input, output_path):
     model.eval()
-    torch.onnx.export(model, dummy_input, output_path, do_constant_folding=True)
+    torch.onnx.export(model, dummy_input, output_path, do_constant_folding=True, dynamic_axes=None, opset_version=17)
     print(f"Exported model to ONNX: {output_path}")
 
 
@@ -45,14 +45,14 @@ if __name__ == '__main__':
 
     dummy_input = torch.randn(1, 3, 640, 640)
 
-    export_onnx(model, dummy_input, args.trt_path)
+    export_onnx(model, dummy_input, args.onnx_path)
 
     if args.build_trt:
         build_trt(args.onnx_path, args.trt_path, fp16=args.fp16)
 
 
 
-# usage: .\utils\convert_model.py --weights_path models/yolo_ppe.pth --config models/yolo11_ppe_cfg.yaml --onnx_path models/yolo_ppe.onnx --trt_path yolo_ppe.trt --build_trt --fp16
+# usage: .\utils\convert_model.py --weights_path models/yolo_ppe.pth --config models/yolo11_ppe_cfg.yaml --onnx_path models/yolo_ppe.onnx --trt_path yolo_ppe.trt --fp16
 
 
 
