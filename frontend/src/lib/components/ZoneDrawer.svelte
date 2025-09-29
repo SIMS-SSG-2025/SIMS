@@ -44,10 +44,15 @@
     }
 
     function handleMouseMove(event: MouseEvent): void {
+        const pos = getMousePos(event);
+        const idx = findPointIndex(pos);
         if (draggingPointsIndex !== null) {
             const pos = getMousePos(event);
             points[draggingPointsIndex] = pos;
             redraw();
+        }
+        if (canvas) {
+            canvas.style.cursor = idx !== -1 ? "pointer" : "crosshair";
         }
     }
 
@@ -138,16 +143,32 @@
 
 </script>
 
-<div class="controls">
-    <button on:click={handleUndo}>Undo</button>
-    <button on:click={handleFinish}>Finish Zone</button>
+<div>
+    <div class="flex gap-2 mt-4 mb-2">
+        <button
+            class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
+            on:click={handleUndo}
+            aria-label="Undo last point"
+            type="button"
+        >
+            Undo
+        </button>
+        <button
+            class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
+            on:click={handleFinish}
+            aria-label="Finish zone"
+            type="button"
+        >
+            Finish Zone
+        </button>
+    </div>
+    <canvas
+        bind:this={canvas}
+        on:click={handleClick}
+        on:mousedown={handleMouseDown}
+        on:mousemove={handleMouseMove}
+        on:mouseup={handleMouseUp}
+        class="border border-gray-300 rounded shadow"
+        style="cursor: crosshair;"
+    ></canvas>
 </div>
-
-<canvas
-    bind:this={canvas}
-    on:click={handleClick}
-    on:mousedown={handleMouseDown}
-    on:mousemove={handleMouseMove}
-    on:mouseup={handleMouseUp}
-    style="border:1px solid #ccc; cursor: crosshair;"
-></canvas>
