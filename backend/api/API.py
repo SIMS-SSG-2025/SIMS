@@ -4,11 +4,14 @@ import sqlite3
 from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import cv2
-
+import json
+from db.database_manager import DatabaseManager
 
 app = FastAPI()
 snapshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),"device", "snapshot")
 db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db","events.db")
+db_manager = DatabaseManager(db_path)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,3 +46,12 @@ def take_snapshot():
     file_path = os.path.join(snapshot_path, filename)
     cv2.imwrite(file_path, frame)
     return FileResponse(file_path, media_type="image/png")
+
+@app.post("/zones")
+def receive_zones(zone_data: dict):
+    points = zone_data.get("points")
+    name = zone_data.get("name", "Unnamed Zone")
+    if not points:
+        return {"status": "error", "message": "No points provided"}
+    db_manager.insert_zone(points, name)
+    return {"status": "success", "message": "Zone data received"}
