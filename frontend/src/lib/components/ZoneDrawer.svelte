@@ -1,13 +1,19 @@
-<script>
+<script lang="ts">
     import { onMount } from "svelte";
-    let canvas;
-    let ctx;
-    let img;
-    let drawing = false;
-    let points = [];
+
+    interface Point {
+        x: number;
+        y: number;
+    }
+    let canvas: HTMLCanvasElement;
+    let ctx: CanvasRenderingContext2D;
+    let img: HTMLImageElement;
+    let drawing: boolean = false;
+    let points: Point[] = [];
+    let draggingPointsIndex: number | null = null;
 
     onMount(() => {
-        ctx = canvas.getContext("2d");
+        ctx = canvas.getContext("2d")!;
         img = new Image();
         img.src = "/snapshot.jpg";
         img.onload = () => {
@@ -17,25 +23,74 @@
         };
     })
 
-    function handleClick(event) {
+    function getMousePos(event: MouseEvent): Point {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        };
+    }
+
+    function findPointIndex(pos: Point): number {
+        return points.findIndex((pt) => Math.hypot(pt.x - pos.x, pt.y - pos.y) < 6);
+    }
+
+    function handleMouseDown(event: MouseEvent): void {
+        const pos = getMousePos(event);
+        const idx = findPointIndex(pos);
+        if (idx !== -1) {
+            draggingPointsIndex = idx;
+        }
+    }
+
+    function handleMouseMove(event: MouseEvent): void {
+        const pos = getMousePos(event);
+        const idx = findPointIndex(pos);
+        if (draggingPointsIndex !== null) {
+            const pos = getMousePos(event);
+            points[draggingPointsIndex] = pos;
+            redraw();
+        }
+        if (canvas) {
+            canvas.style.cursor = idx !== -1 ? "pointer" : "crosshair";
+        }
+    }
+
+    function handleMouseUp(): void {
+        if (draggingPointsIndex !== null) {
+            points = orderPolygonPoints(points);
+            redraw();
+        }
+        draggingPointsIndex = null;
+    }
+
+    function handleClick(event: MouseEvent): void {
+        const pos = getMousePos(event);
+        // Only add a point if not clicking on an existing point
+        if (findPointIndex(pos) !== -1) return;
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        points.push([x, y]);
+        points = [...points, {x, y}];
+        points = orderPolygonPoints(points);
         console.log(points);
         redraw();
     }
 
-    function handleUndo() {
+    function handleUndo(): void {
         points.pop();
         console.log(points);
         redraw();
     }
 
-    function handleFinish() {
+    function handleFinish(): void {
         if(points.length > 2) {
             // Here you would typically send the points to the backend
-            console.log("Zone JSON:", JSON.stringify({ points }));
+            const normalizedPoints = points.map(p => ({
+                x: p.x / canvas.width,
+                y: p.y / canvas.height
+            }));
+            console.log("Zone JSON:", JSON.stringify({ points: normalizedPoints }));
             points = [];
             redraw();
         }
@@ -45,44 +100,75 @@
 
     }
 
-    function redraw() {
+    function orderPolygonPoints(points: Point[]): Point[] {
+        const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+        const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+        return [...points].sort((a, b) => {
+            const angleA = Math.atan2(a.y - cy, a.x - cx);
+            const angleB = Math.atan2(b.y - cy, b.x - cx);
+            return angleA - angleB;
+        });
+    }
+
+    function redraw(): void {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
 
         if (points.length > 0) {
-        // Draw filled polygon if 3+ points
-        if (points.length >= 3) {
-            ctx.beginPath();
-            ctx.moveTo(points[0][0], points[0][1]);
-            for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i][0], points[i][1]);
-            }
-            ctx.closePath();
-            ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
-            ctx.fill();
+            // Draw filled polygon if 3+ points
+            if (points.length >= 3) {
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
+                ctx.fill();
 
-            ctx.strokeStyle = "red";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
-
-        // Draw small blue circles at each point
-        points.forEach((pt) => {
-            if (Array.isArray(pt) && pt.length === 2) {
-            const [px, py] = pt;
-            ctx.beginPath();
-            ctx.arc(px, py, 4, 0, Math.PI * 2);
-            ctx.fillStyle = "blue";
-            ctx.fill();
+                ctx.strokeStyle = "red";
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
-        });
+
+            // Draw small blue circles at each point
+            points.forEach((pt) => {
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = "blue";
+                ctx.fill();
+            });
         }
     }
+
 </script>
 
-<div class="controls">
-    <button on:click={handleUndo}>Undo</button>
-    <button on:click={handleFinish}>Finish Zone</button>
+<div>
+    <div class="flex gap-2 mt-4 mb-2">
+        <button
+            class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
+            on:click={handleUndo}
+            aria-label="Undo last point"
+            type="button"
+        >
+            Undo
+        </button>
+        <button
+            class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
+            on:click={handleFinish}
+            aria-label="Finish zone"
+            type="button"
+        >
+            Finish Zone
+        </button>
+    </div>
+    <canvas
+        bind:this={canvas}
+        on:click={handleClick}
+        on:mousedown={handleMouseDown}
+        on:mousemove={handleMouseMove}
+        on:mouseup={handleMouseUp}
+        class="border border-gray-300 rounded shadow"
+        style="cursor: crosshair;"
+    ></canvas>
 </div>
-
-<canvas bind:this={canvas} on:click={handleClick} style="border:1px solid #ccc; cursor: crosshair;" />
