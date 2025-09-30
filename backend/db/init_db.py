@@ -1,6 +1,9 @@
 import sqlite3
 import datetime
-sqlconn = sqlite3.connect("events.db")
+import os
+
+db_path = os.path.join(os.path.dirname(__file__), "events.db")
+sqlconn = sqlite3.connect(db_path)
 
 cursor = sqlconn.cursor()
 timeslot = datetime.datetime.now()

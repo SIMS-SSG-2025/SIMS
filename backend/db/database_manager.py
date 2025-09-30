@@ -16,16 +16,6 @@ class DatabaseManager:
         sqlconn.close()
 
 
-    def insert_zone(self,zone_id,coords,name):
-        sqlconn = sqlite3.connect(self.db_path)
-        cursor = sqlconn.cursor()
-        cursor.execute("""INSERT INTO zones (zone_id,coords,name) VALUES (?,?,?)""", (zone_id,coords,name))
-        sqlconn.commit()
-        sqlconn.close()
-
-
-
-
     def insert_events(self,object_id,zone_id,location,has_helmet,has_vest,time):
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()

@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import cv2
 import json
-from db.database_manager import DatabaseManager
+from ..db.database_manager import DatabaseManager
 
 app = FastAPI()
 snapshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),"device", "snapshot")

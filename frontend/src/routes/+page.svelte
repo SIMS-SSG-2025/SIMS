@@ -47,6 +47,19 @@
             loading = false;
         }
     }
+
+    async function sendZone(points: { x: number; y: number }[], name: string) {
+        const response = await fetch("http://127.0.0.1:8000/zones", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ points, name })
+        });
+        const data = await response.json();
+        console.log(data);
+    }
+
 </script>
 
 <!-- <h1>Events</h1>
@@ -64,7 +77,7 @@
 {/if} -->
 
 
-<ZoneDrawer />
+<ZoneDrawer onFinishZone={sendZone} />
 
 <!-- <div class="grid grid-cols-2 gap-4 p-4 bg-gray-100 min-h-screen">
   <div class="card col-span-2"><TablePlaceholder /></div>
