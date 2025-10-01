@@ -14,7 +14,9 @@ def build_trt(onnx_path, trt_path, fp16=True):
     cmd = [
         "trtexec",
         f"--onnx={onnx_path}",
-        f"--saveEngine={trt_path}"
+        f"--saveEngine={trt_path}",
+        "--explicitBatch",
+        "--workspace=512",
     ]
     if fp16:
         cmd.append("--fp16")
@@ -43,9 +45,9 @@ if __name__ == '__main__':
     model = DetectionModel(cfg=model_config, nc=num_classes)
     model.load_state_dict(torch.load(model_path, map_location=lambda storage, loc: storage))
 
-    dummy_input = torch.randn(1, 3, 640, 640)
+    dummy_input = torch.randn(1, 3, 640, 640).half()
 
-    export_onnx(model, dummy_input, args.trt_path)
+    export_onnx(model, dummy_input, args.onnx_path)
 
     if args.build_trt:
         build_trt(args.onnx_path, args.trt_path, fp16=args.fp16)

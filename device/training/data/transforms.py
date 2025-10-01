@@ -3,7 +3,7 @@ import cv2
 
 def letterbox(img, boxes=None, new_shape=(640, 640), normalized=True):
     if img.shape[0] == new_shape[0] and img.shape[1] == new_shape[1]:
-        return img, boxes
+        return img, boxes, (1, 0 ,0)
     original_shape = img.shape[:2]
     ratio = min(new_shape[0] / original_shape[0], new_shape[1] / original_shape[1])
     new_unpad = (int(round(original_shape[1] * ratio)), int(round(original_shape[0] * ratio)))
