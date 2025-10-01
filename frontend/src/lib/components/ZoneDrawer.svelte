@@ -1,4 +1,5 @@
 <script lang="ts">
+    export let onFinishZone: (points: { x: number; y: number }[], name: string) => void;
     import { onMount } from "svelte";
 
     interface Point {
@@ -91,6 +92,7 @@
                 y: p.y / canvas.height
             }));
             console.log("Zone JSON:", JSON.stringify({ points: normalizedPoints }));
+            onFinishZone(normalizedPoints, "Zone A");
             points = [];
             redraw();
         }
