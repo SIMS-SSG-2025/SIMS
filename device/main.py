@@ -12,6 +12,9 @@ from multiprocessing import Process, Queue, Event
 import yaml
 from ultralytics.nn.tasks import DetectionModel
 import torch
+from utils.logger import get_logger
+
+
 from device.training.dataset.dataset_transform import load_class_mapping
 
 def capture_process(queue, stop_event):
@@ -71,7 +74,6 @@ def event_process(detection_queue, visualization_queue, stop_event, tracker, eve
 
     print("Event process exited.")
 
-
 if __name__ == "__main__":
     multiprocessing.set_start_method('spawn') # Windows specific
 
@@ -91,7 +93,8 @@ if __name__ == "__main__":
     print(class_names)
 
     tracker = Tracker(class_names=class_names)
-    event_manager = EventManager()
+    logger = get_logger("inference")
+    event_manager = EventManager(logger=logger)
     prev_time = time.time()
 
     queue = Queue(maxsize=5)
@@ -162,15 +165,13 @@ if __name__ == "__main__":
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     detections = run_inference(rgb_frame, model)
-    print(detections)
-    trackable_classes = ["person", "vehicle"]
+
     ppe_classes = ["helmet", "vest"]
     # Jämför format på detections
     detections_for_tracking = [d for d in detections if class_names[d[-1]] in trackable_classes]
-    print(f"det for tracking: {detections_for_tracking}")
     ppe_detections = [d for d in detections if class_names[d[-1]] in ppe_classes]
     tracked_objects = tracker.update(detections_for_tracking, frame)
-    #event_manager.handle_detections(tracked_objects, ppe_detections)
+
     if tracked_objects is None:
         continue
     for obj in tracked_objects:
