@@ -1,5 +1,7 @@
 <script lang="ts">
     export let onFinishZone: (points: { x: number; y: number }[], name: string) => void;
+    export let width: number = 640;
+    export let height: number = 360;
     import { onMount } from "svelte";
 
     interface Point {
@@ -18,17 +20,42 @@
         img = new Image();
         img.src = "/snapshot.jpg";
         img.onload = () => {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
+            canvas.width = width;
+            canvas.height = height;
+            drawImageContained();
         };
     })
 
+    function drawImageContained() {
+        // Draw the image to fully fit the canvas (object-fit: contain)
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const imgAspect = img.width / img.height;
+        const canvasAspect = canvas.width / canvas.height;
+        let drawWidth, drawHeight, offsetX, offsetY;
+        if (imgAspect > canvasAspect) {
+            // Image is wider than canvas
+            drawWidth = canvas.width;
+            drawHeight = canvas.width / imgAspect;
+            offsetX = 0;
+            offsetY = (canvas.height - drawHeight) / 2;
+        } else {
+            // Image is taller than canvas
+            drawHeight = canvas.height;
+            drawWidth = canvas.height * imgAspect;
+            offsetX = (canvas.width - drawWidth) / 2;
+            offsetY = 0;
+        }
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    }
+
     function getMousePos(event: MouseEvent): Point {
         const rect = canvas.getBoundingClientRect();
+        // Scale mouse position to canvas size
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
         return {
-            x: event.clientX - rect.left,
-            y: event.clientY - rect.top
+            x: (event.clientX - rect.left) * scaleX,
+            y: (event.clientY - rect.top) * scaleY
         };
     }
 
@@ -113,8 +140,7 @@
     }
 
     function redraw(): void {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
+        drawImageContained();
 
         if (points.length > 0) {
             // Draw filled polygon if 3+ points
@@ -145,7 +171,7 @@
 
 </script>
 
-<div>
+<div class="flex flex-col items-center">
     <div class="flex gap-2 mt-4 mb-2">
         <button
             class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -166,11 +192,13 @@
     </div>
     <canvas
         bind:this={canvas}
+        width={width}
+        height={height}
         on:click={handleClick}
         on:mousedown={handleMouseDown}
         on:mousemove={handleMouseMove}
         on:mouseup={handleMouseUp}
         class="border border-gray-300 rounded shadow"
-        style="cursor: crosshair;"
+        style="cursor: crosshair; width: 100%; height: 100%; background: #000; display: block;"
     ></canvas>
 </div>
