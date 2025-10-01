@@ -8,7 +8,14 @@
 {#if open}
 	<div class="fixed inset-0 z-50 flex items-center justify-center">
 		<!-- Blurred background -->
-		<div class="absolute inset-0 backdrop-blur-sm bg-black/20" on:click={onClose}></div>
+		<div
+			class="absolute inset-0 backdrop-blur-sm bg-black/20"
+			role="button"
+			tabindex="0"
+			aria-label="Close modal background"
+			on:click={onClose}
+			on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onClose(); } }}
+		></div>
 		<!-- Modal content -->
 		<div class={`relative bg-white rounded-2xl shadow-2xl z-10 border border-gray-200 flex flex-col items-center ${modalClass}`}>
 			<button

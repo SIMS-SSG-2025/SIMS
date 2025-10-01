@@ -11,6 +11,9 @@
     let canvas: HTMLCanvasElement;
     let ctx: CanvasRenderingContext2D;
     let img: HTMLImageElement;
+    let container: HTMLDivElement;
+    let renderedWidth = width;
+    let renderedHeight = height;
     let drawing: boolean = false;
     let points: Point[] = [];
     let draggingPointsIndex: number | null = null;
@@ -20,26 +23,39 @@
         img = new Image();
         img.src = "/snapshot.jpg";
         img.onload = () => {
-            canvas.width = width;
-            canvas.height = height;
+            updateCanvasSize();
             drawImageContained();
+        };
+        window.addEventListener('resize', updateCanvasSize);
+        return () => {
+            window.removeEventListener('resize', updateCanvasSize);
         };
     })
 
+    function updateCanvasSize() {
+        if (container && img) {
+            // Get the container's size (which matches the image's rendered size)
+            renderedWidth = container.clientWidth;
+            renderedHeight = container.clientHeight;
+            canvas.width = renderedWidth;
+            canvas.height = renderedHeight;
+            drawImageContained();
+            redraw();
+        }
+    }
+
     function drawImageContained() {
-        // Draw the image to fully fit the canvas (object-fit: contain)
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!img.complete) return;
         const imgAspect = img.width / img.height;
         const canvasAspect = canvas.width / canvas.height;
         let drawWidth, drawHeight, offsetX, offsetY;
         if (imgAspect > canvasAspect) {
-            // Image is wider than canvas
             drawWidth = canvas.width;
             drawHeight = canvas.width / imgAspect;
             offsetX = 0;
             offsetY = (canvas.height - drawHeight) / 2;
         } else {
-            // Image is taller than canvas
             drawHeight = canvas.height;
             drawWidth = canvas.height * imgAspect;
             offsetX = (canvas.width - drawWidth) / 2;
@@ -50,12 +66,10 @@
 
     function getMousePos(event: MouseEvent): Point {
         const rect = canvas.getBoundingClientRect();
-        // Scale mouse position to canvas size
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
+        // Map mouse position to canvas coordinates
         return {
-            x: (event.clientX - rect.left) * scaleX,
-            y: (event.clientY - rect.top) * scaleY
+            x: (event.clientX - rect.left) * (canvas.width / rect.width),
+            y: (event.clientY - rect.top) * (canvas.height / rect.height)
         };
     }
 
@@ -190,15 +204,18 @@
             Finish Zone
         </button>
     </div>
-    <canvas
-        bind:this={canvas}
-        width={width}
-        height={height}
-        on:click={handleClick}
-        on:mousedown={handleMouseDown}
-        on:mousemove={handleMouseMove}
-        on:mouseup={handleMouseUp}
-        class="border border-gray-300 rounded shadow"
-        style="cursor: crosshair; width: 100%; height: 100%; background: #000; display: block;"
-    ></canvas>
+    <div bind:this={container} class="relative w-full h-auto" style="aspect-ratio: {width} / {height}; max-width: 100%;">
+        <img src="/snapshot.jpg" alt="Snapshot" class="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable="false" style="z-index:1;" />
+        <canvas
+            bind:this={canvas}
+            width={renderedWidth}
+            height={renderedHeight}
+            on:click={handleClick}
+            on:mousedown={handleMouseDown}
+            on:mousemove={handleMouseMove}
+            on:mouseup={handleMouseUp}
+            class="border border-gray-300 rounded shadow absolute inset-0"
+            style="cursor: crosshair; width: 100%; height: 100%; background: transparent; z-index:2;"
+        ></canvas>
+    </div>
 </div>

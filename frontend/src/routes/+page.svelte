@@ -97,6 +97,21 @@
         console.log(data);
     }
 
+    async function fetchLogs() {
+        try {
+            const response = await fetch("http://10.10.67.44:8000/logs");
+            if (!response.ok) {
+                throw new Error(`Error fetching logs: ${response.statusText}`);
+            }
+            const logs = await response.json();
+            console.log(logs);
+        } catch (err: any) {
+            error = err.message;
+        } finally {
+            loading = false;
+        }
+    }
+
 </script>
 
 <header class="w-full bg-white shadow flex items-center justify-between px-8 py-4">
@@ -152,11 +167,11 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="bg-white rounded-2xl shadow p-6 min-h-[320px] flex flex-col">
             <span class="text-lg font-semibold text-gray-700 mb-2">Line Chart</span>
-            <div class="flex-1 flex items-center justify-center text-gray-300">[Chart.js Line Chart Placeholder]</div>
+            <div class="flex-1 flex items-center justify-center text-gray-300"><LineChart /></div>
         </div>
         <div class="bg-white rounded-2xl shadow p-6 min-h-[320px] flex flex-col">
-            <span class="text-lg font-semibold text-gray-700 mb-2">Bar Chart</span>
-            <div class="flex-1 flex items-center justify-center text-gray-300">[Chart.js Bar Chart Placeholder]</div>
+            <span class="text-lg font-semibold text-gray-700 mb-2">Line Chart</span>
+            <div class="flex-1 flex items-center justify-center text-gray-300"><LineChart /></div>
         </div>
         <div class="bg-white rounded-2xl shadow p-6 min-h-[320px] flex flex-col items-center justify-center">
             <img src="/snapshot.jpg" alt="Snapshot" class="rounded-xl shadow max-w-full max-h-64 object-contain border border-gray-200 mb-4" />
@@ -181,6 +196,9 @@
         </div>
         <div class="bg-white rounded-2xl shadow p-6 flex flex-col min-h-[120px]">
             <span class="text-2xl font-bold text-gray-800 mb-2">Log Messages</span>
+            <button on:click={fetchLogs} class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition">
+                Fetch Logs
+            </button>
             <div class="flex-1 w-full max-h-32 overflow-y-auto text-sm text-gray-700 bg-gray-50 rounded p-2 border border-gray-200">
                 <!-- Placeholder for log messages -->
                 <div>No log messages yet.</div>
@@ -188,11 +206,11 @@
         </div>
     </div>
 
-    <Modal open={showZoneModal} onClose={closeZoneModal} modalClass="p-0 w-auto h-auto max-w-5xl max-h-[90vh]">
+    <Modal open={showZoneModal} onClose={closeZoneModal} modalClass="p-0 w-full max-w-6xl max-h-[95vh]">
         <span class="text-lg font-semibold text-gray-700 mb-2 mt-6">Draw Zones on Snapshot</span>
-        <div class="flex flex-col items-center">
-            <div class="relative bg-black rounded-xl overflow-hidden" style="width:1024px; height:576px;">
-                <ZoneDrawer onFinishZone={sendZone} width={1024} height={576} />
+        <div class="flex flex-col items-center p-6 w-full">
+            <div class="w-full" style="max-width:1200px;">
+                <ZoneDrawer onFinishZone={sendZone} width={1200} height={675} />
             </div>
         </div>
     </Modal>
