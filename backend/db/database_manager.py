@@ -1,4 +1,5 @@
 import sqlite3
+import json
 
 
 class DatabaseManager:
@@ -13,16 +14,6 @@ class DatabaseManager:
         cursor.execute("""INSERT INTO object (object_id,type) VALUES (?,?)""", (object_id,object_type))
         sqlconn.commit()
         sqlconn.close()
-
-
-    def insert_zone(self,zone_id,coords,name):
-        sqlconn = sqlite3.connect(self.db_path)
-        cursor = sqlconn.cursor()
-        cursor.execute("""INSERT INTO zones (zone_id,coords,name) VALUES (?,?,?)""", (zone_id,coords,name))
-        sqlconn.commit()
-        sqlconn.close()
-
-
 
 
     def insert_events(self,object_id,zone_id,location,has_helmet,has_vest,time):
@@ -42,3 +33,11 @@ class DatabaseManager:
         rows = cursor.fetchall()
         sqlconn.close()
         return rows
+
+    def insert_zone(self, points, name):
+        coords_json = json.dumps(points)
+        sqlconn = sqlite3.connect(self.db_path)
+        cursor = sqlconn.cursor()
+        cursor.execute("""INSERT INTO zones (coords,name) VALUES (?,?)""", (coords_json,name))
+        sqlconn.commit()
+        sqlconn.close()
