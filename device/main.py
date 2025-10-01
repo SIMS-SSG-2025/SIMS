@@ -12,7 +12,7 @@ from multiprocessing import Process, Queue, Event
 import yaml
 from ultralytics.nn.tasks import DetectionModel
 import torch
-from utils.logger import get_logger
+from .utils.logger import get_logger
 
 
 from device.training.dataset.dataset_transform import load_class_mapping
