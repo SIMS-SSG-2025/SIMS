@@ -1,0 +1,2 @@
+2025-10-01 15:03:34 - Inference - INFO - [DB] Object created: {'track_id': '2', 'type': 'Person'}
+2025-10-01 15:04:56 - Inference - INFO - [DB] Object created: {'track_id': '1', 'type': 'Person'}

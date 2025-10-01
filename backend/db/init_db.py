@@ -15,7 +15,7 @@ has_helmet INTEGER NOT NULL DEFAULT 0 CHECK(has_helmet IN (0,1)),has_vest INTEGE
 FOREIGN KEY (zone_id) REFERENCES zones (zone_id))""")
 
 cursor.execute("""CREATE TABLE IF NOT EXISTS zones (zone_id INTEGER PRIMARY KEY AUTOINCREMENT, coords TEXT NOT NULL, name TEXT NOT NULL)""")
-cursor.execute("""CREATE TABLE IF NOT EXISTS object (object_id INTEGER PRIMARY KEY ,type TEXT NOT NULL)""")
+cursor.execute("""CREATE TABLE IF NOT EXISTS object (object_id INTEGER PRIMARY KEY, type TEXT NOT NULL)""")
 
 sqlconn.commit()
 sqlconn.close()

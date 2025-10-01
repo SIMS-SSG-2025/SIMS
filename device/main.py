@@ -42,8 +42,10 @@ def inference_process(queue, detection_queue, stop_event, model):
     print("Inference process exited.")
 
 
-def event_process(detection_queue, visualization_queue, stop_event, tracker, event_manager, class_names):
+def event_process(detection_queue, visualization_queue, stop_event, tracker, class_names):
     print("Event process started.")
+    logger = get_logger("Inference")
+    event_manager = EventManager(logger=logger)
     while not stop_event.is_set():
         if not detection_queue.empty():
             detections, frame = detection_queue.get()
@@ -53,7 +55,7 @@ def event_process(detection_queue, visualization_queue, stop_event, tracker, eve
             detections_for_tracking = [d for d in detections if class_names[d[-1]] in trackable_classes]
             ppe_detections = [d for d in detections if class_names[d[-1]] in ppe_classes]
             tracked_objects = tracker.update(detections_for_tracking, frame)
-            #event_manager.handle_detections(tracked_objects, ppe_detections)
+            event_manager.handle_detections(tracked_objects, ppe_detections)
             if tracked_objects is None:
                 continue
             for obj in tracked_objects:
@@ -93,8 +95,6 @@ if __name__ == "__main__":
     print(class_names)
 
     tracker = Tracker(class_names=class_names)
-    logger = get_logger("inference")
-    event_manager = EventManager(logger=logger)
     prev_time = time.time()
 
     queue = Queue(maxsize=5)
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     processes = [
         Process(target=capture_process, args=(queue, stop_event)),
         Process(target=inference_process, args=(queue, result_queue, stop_event, model)),
-        Process(target=event_process, args=(result_queue, visualization_queue, stop_event, tracker, event_manager, class_names))
+        Process(target=event_process, args=(result_queue, visualization_queue, stop_event, tracker, class_names))
     ]
 
     try:
