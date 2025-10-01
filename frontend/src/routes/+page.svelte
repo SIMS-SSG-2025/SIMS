@@ -22,12 +22,19 @@
 
         // Modal state
     let showZoneModal = false;
+    let showSettingsModal = false;
 
     function openZoneModal() {
         showZoneModal = true;
     }
     function closeZoneModal() {
         showZoneModal = false;
+    }
+    function openSettingsModal() {
+        showSettingsModal = true;
+    }
+    function closeSettingsModal() {
+        showSettingsModal = false;
     }
 
     const ranges: { label: string; value: "day" | "week" | "month" | "all" }[] = [
@@ -99,7 +106,7 @@
 
     async function fetchLogs() {
         try {
-            const response = await fetch("http://10.10.67.44:8000/logs");
+            const response = await fetch("http://10.10.67.45:8000/logs");
             if (!response.ok) {
                 throw new Error(`Error fetching logs: ${response.statusText}`);
             }
@@ -118,7 +125,7 @@
     <!-- Left: Date & Time -->
     <div class="flex items-center min-w-[180px]">
         <span class="text-gray-700 font-mono text-lg select-none">
-            {now.toLocaleDateString()} {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {now.toLocaleDateString('sv-SE')} {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
     </div>
 
@@ -143,11 +150,14 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
         </button>
-        <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Settings">
+        <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Settings" on:click={openSettingsModal}>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2" />
             </svg>
         </button>
+    <Modal open={showSettingsModal} onClose={closeSettingsModal} modalClass="p-0 w-full max-w-md max-h-[90vh]">
+        <span class="text-lg font-semibold text-gray-700 mb-2 mt-6">Settings</span>
+    </Modal>
     </div>
 </header>
 
