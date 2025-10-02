@@ -94,6 +94,20 @@ else:
 
 model = model.to(DEVICE)
 
+# Freeze layers
+
+unfreeze = [-1]
+
+for param in model.parameters():
+    param.requires_grad = False
+
+for layer_id in unfreeze:
+    for name, param in model.model[layer_id].named_parameters():
+        param.requires_grad = True
+
+for name, param in model.named_parameters():
+    if param.requires_grad:
+        print(f"Trainable: {name}")
 
 # Training
 
