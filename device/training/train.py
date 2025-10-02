@@ -46,6 +46,7 @@ BASE_MODEL = config['model']['base_model']
 MODEL_CHECKPOINT = config['model']['model_checkpoint']
 MODEL_CONFIG = config['model']['model_config']
 LOG_DIR = config['training']['log_dir']
+DATASET_CONFIG = config['data']['data_config']
 print(LEARNING_RATE)
 
 # Dataset and dataloaders
@@ -84,9 +85,11 @@ if config["training"]["train_from_checkpoint"]:
     model.load_state_dict(torch.load(MODEL_CHECKPOINT, map_location=lambda storage, loc: storage))
     print("continue from checkpoint")
 else:
+    with open(DATASET_CONFIG, 'r') as file:
+        data_config = yaml.safe_load(file)
     model_checkpoint = torch.load(BASE_MODEL)
     model_config = model_checkpoint['model'].yaml
-    num_classes = model_config["nc"]
+    num_classes = data_config["nc"]
     model = DetectionModel(cfg=model_config, nc=num_classes, verbose=True)
     model.load(model_checkpoint)
     print("base model")
@@ -96,7 +99,7 @@ model = model.to(DEVICE)
 
 # Freeze layers
 
-unfreeze = [-1]
+unfreeze = list(range(0,24))
 
 for param in model.parameters():
     param.requires_grad = False
@@ -133,7 +136,7 @@ val_dfl_loss = []
 
 
 # Early stopping
-patience = 5
+patience = 3
 best_val_loss = float("inf")
 epochs_no_improve = 0
 best_model_state = None
