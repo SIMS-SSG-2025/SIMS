@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
 from data.dataset import SafetyDataset
 from ultralytics.data.dataset import YOLODataset
 from ultralytics.nn.tasks import DetectionModel
@@ -9,6 +10,7 @@ import yaml
 from types import SimpleNamespace
 import numpy as np
 from utils.loss import DetectionLoss
+import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -43,7 +45,7 @@ else:
 BASE_MODEL = config['model']['base_model']
 MODEL_CHECKPOINT = config['model']['model_checkpoint']
 MODEL_CONFIG = config['model']['model_config']
-
+LOG_DIR = config['training']['log_dir']
 print(LEARNING_RATE)
 
 # Dataset and dataloaders
@@ -84,7 +86,8 @@ if config["training"]["train_from_checkpoint"]:
 else:
     model_checkpoint = torch.load(BASE_MODEL)
     model_config = model_checkpoint['model'].yaml
-    model = DetectionModel(cfg=model_config, nc=10, verbose=True)
+    num_classes = model_config["nc"]
+    model = DetectionModel(cfg=model_config, nc=num_classes, verbose=True)
     model.load(model_checkpoint)
     print("base model")
 
@@ -113,6 +116,16 @@ train_dfl_loss = []
 val_box_loss = []
 val_cls_loss = []
 val_dfl_loss = []
+
+
+# Early stopping
+patience = 5
+best_val_loss = float("inf")
+epochs_no_improve = 0
+best_model_state = None
+
+# Tensorboard
+writer = SummaryWriter(log_dir=LOG_DIR)
 
 
 # Training loop
@@ -194,5 +207,30 @@ for epoch in range(EPOCHS):
         f"(box {mean_val_box:.4f}, cls {mean_val_cls:.4f}, dfl {mean_val_dfl:.4f})"
     )
 
-# TODO: add early stopping
-torch.save(model.state_dict(), "yolo11_ppe_best.pth")
+    # Tensorboard logging
+    writer.add_scalar("Loss/train_total", mean_train_loss, epoch)
+    writer.add_scalar("Loss/val_total", mean_val_loss, epoch)
+
+    writer.add_scalar("Loss/train_box", mean_train_box, epoch)
+    writer.add_scalar("Loss/train_cls", mean_train_cls, epoch)
+    writer.add_scalar("Loss/train_dfl", mean_train_dfl, epoch)
+
+    writer.add_scalar("Loss/val_box", mean_val_box, epoch)
+    writer.add_scalar("Loss/val_cls", mean_val_cls, epoch)
+    writer.add_scalar("Loss/val_dfl", mean_val_dfl, epoch)
+
+    if mean_val_loss < best_val_loss:
+        best_val_loss = mean_val_loss
+        epochs_no_improve = 0
+        best_model_state = copy.deepcopy(model.state_dict())
+    else:
+        epochs_no_improve += 1
+
+    if epochs_no_improve >= patience:
+        print(f"Early stopping at epoch: {epoch}. Saving best model...")
+        model.load_state_dict(best_model_state)
+        break
+
+
+torch.save(model.state_dict(), "yolo11_ppe_best.pt")
+writer.close()
