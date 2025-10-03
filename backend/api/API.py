@@ -4,7 +4,8 @@ import sqlite3
 from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import cv2
-from device.utils.logger import get_logger
+from starlette.responses import StreamingResponse
+
 from ..db.database_manager import DatabaseManager
 from pathlib import Path
 import json
@@ -69,3 +70,19 @@ def get_logs():
             lines = f.read().splitlines()
             return {"logs": lines}
     return {"logs": []}
+
+
+
+@app.get("/zones/stream")
+def stream_zones():
+    def event_stream():
+        last_id = set()
+        while True:
+            zones = DatabaseManager.fetch_zones()
+            current_id = set([z['zone_id'] for z in zones])
+
+            if current_id != last_id:
+                last_id = current_id
+                yield f" data: {json.dumps(zones)}\n\n"
+            time.sleep(1)
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
