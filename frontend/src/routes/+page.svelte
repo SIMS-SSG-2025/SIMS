@@ -125,7 +125,7 @@
     <!-- Left: Date & Time -->
     <div class="flex items-center min-w-[180px]">
         <span class="text-gray-700 font-mono text-lg select-none">
-            {now.toLocaleDateString('sv-SE')} {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {now.toLocaleDateString('sv-SE')} {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
         </span>
     </div>
 
