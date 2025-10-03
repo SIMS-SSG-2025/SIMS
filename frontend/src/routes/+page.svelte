@@ -10,6 +10,14 @@
     let interval: any;
     let selectedRange: "day" | "week" | "month" | "all" = "day";
 
+    type Zone = {
+        points: { x: number; y: number }[];
+        name: string;
+    }
+
+    let zones: Zone[] = [];
+    let showZones = true;
+
     onMount(() => {
         interval = setInterval(() => {
             now = new Date();
@@ -52,6 +60,10 @@
     let loading = false;
     let error: string | null = null;
 
+    function removeZone(index: number) {
+        zones = zones.slice(0, index).concat(zones.slice(index + 1));
+    }
+
     async function fetchSnapshot() {
         loading = true;
         error = null;
@@ -75,6 +87,8 @@
 
     let events: Event[] = [];
 
+    let logs: string[] = [];
+
     async function loadEvents() {
         loading = true;
         error = null;
@@ -93,6 +107,8 @@
     }
 
     async function sendZone(points: { x: number; y: number }[], name: string) {
+
+        zones = [...zones, { points, name }];
         const response = await fetch("http://127.0.0.1:8000/zones", {
             method: "POST",
             headers: {
@@ -106,18 +122,28 @@
 
     async function fetchLogs() {
         try {
-            const response = await fetch("http://10.10.67.45:8000/logs");
+            // IP jetson: 10.10.67.44
+            const response = await fetch("http://10.10.67.44:8000/logs");
             if (!response.ok) {
                 throw new Error(`Error fetching logs: ${response.statusText}`);
             }
-            const logs = await response.json();
-            console.log(logs);
+            const data = await response.json();
+            console.log(data);
+            logs = data.logs || [];
         } catch (err: any) {
             error = err.message;
         } finally {
             loading = false;
         }
     }
+    let logInterval: any;
+    onMount(() => {
+        logInterval = setInterval(fetchLogs, 5000);
+        fetchLogs(); // Initial fetch
+        return () => {
+            clearInterval(logInterval);
+        };
+    });
 
 </script>
 
@@ -205,13 +231,16 @@
             <span class="text-gray-400 mt-2">Info or stat</span>
         </div>
         <div class="bg-white rounded-2xl shadow p-6 flex flex-col min-h-[120px]">
-            <span class="text-2xl font-bold text-gray-800 mb-2">Log Messages</span>
-            <button on:click={fetchLogs} class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition">
-                Fetch Logs
-            </button>
             <div class="flex-1 w-full max-h-32 overflow-y-auto text-sm text-gray-700 bg-gray-50 rounded p-2 border border-gray-200">
-                <!-- Placeholder for log messages -->
-                <div>No log messages yet.</div>
+                {#if logs.length > 0}
+                    <ul class="space-y-1">
+                        {#each logs as log}
+                            <li class="whitespace-pre-line">{log}</li>
+                        {/each}
+                    </ul>
+                {:else}
+                    <div>No log messages yet.</div>
+                {/if}
             </div>
         </div>
     </div>
@@ -220,7 +249,34 @@
         <span class="text-lg font-semibold text-gray-700 mb-2 mt-6">Draw Zones on Snapshot</span>
         <div class="flex flex-col items-center p-6 w-full">
             <div class="w-full" style="max-width:1200px;">
-                <ZoneDrawer onFinishZone={sendZone} width={1200} height={675} />
+                <div class="flex items-center mb-4 gap-4">
+                    <button
+                        class="px-4 py-2 rounded-full font-semibold transition bg-blue-600 text-white shadow hover:bg-blue-700"
+                        on:click={() => showZones = !showZones}
+                    >
+                        {showZones ? "Hide Zones" : "Show Zones"}
+                    </button>
+                    <span class="text-gray-600">Zones: {zones.length}</span>
+                    <div class="flex gap-2 flex-wrap">
+                        {#each zones as zone, i}
+                            <span class="inline-flex items-center bg-blue-100 text-blue-800 rounded px-2 py-1 text-xs font-semibold mr-2">
+                                {zone.name || `Zone ${i + 1}`}
+                                <button
+                                    class="ml-1 text-red-500 hover:text-red-700 focus:outline-none"
+                                    title="Remove zone"
+                                    on:click={() => removeZone(i)}
+                                >&#10005;</button>
+                            </span>
+                        {/each}
+                    </div>
+                </div>
+                <ZoneDrawer
+                    onFinishZone={sendZone}
+                    width={1200}
+                    height={675}
+                    {zones}
+                    {showZones}
+                />
             </div>
         </div>
     </Modal>

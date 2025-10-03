@@ -2,6 +2,8 @@
     export let onFinishZone: (points: { x: number; y: number }[], name: string) => void;
     export let width: number = 640;
     export let height: number = 360;
+    export let zones: { points: { x: number; y: number }[], name: string }[] = [];
+    export let showZones: boolean = true;
     import { onMount } from "svelte";
 
     interface Point {
@@ -17,6 +19,9 @@
     let drawing: boolean = false;
     let points: Point[] = [];
     let draggingPointsIndex: number | null = null;
+
+    let showNameInput = false;
+    let newZoneName: string = "";
 
     onMount(() => {
         ctx = canvas.getContext("2d")!;
@@ -122,25 +127,31 @@
     function handleUndo(): void {
         points.pop();
         console.log(points);
+        showNameInput = false;
         redraw();
     }
 
     function handleFinish(): void {
         if(points.length > 2) {
-            // Here you would typically send the points to the backend
-            const normalizedPoints = points.map(p => ({
-                x: p.x / canvas.width,
-                y: p.y / canvas.height
-            }));
-            console.log("Zone JSON:", JSON.stringify({ points: normalizedPoints }));
-            onFinishZone(normalizedPoints, "Zone A");
-            points = [];
-            redraw();
+            showNameInput = true;
+            newZoneName = "";
         }
         else {
             alert("A zone must have at least 3 points.");
         }
 
+    }
+
+    function saveZone() {
+        const normalizedPoints = points.map(p => ({
+            x: p.x / canvas.width,
+            y: p.y / canvas.height
+        }));
+        console.log("Zone JSON:", JSON.stringify({ points: normalizedPoints }));
+        onFinishZone(normalizedPoints, newZoneName || `Zone ${zones.length + 1}`);
+        points = [];
+        showNameInput = false;
+        redraw();
     }
 
     function orderPolygonPoints(points: Point[]): Point[] {
@@ -181,6 +192,27 @@
                 ctx.fill();
             });
         }
+        if (showZones && zones && zones.length > 0) {
+            zones.forEach(zone => {
+                if (zone.points.length >= 3) {
+                    ctx.beginPath();
+                    ctx.moveTo(zone.points[0].x * canvas.width, zone.points[0].y * canvas.height);
+                    for (let i = 1; i < zone.points.length; i++) {
+                        ctx.lineTo(zone.points[i].x * canvas.width, zone.points[i].y * canvas.height);
+                    }
+                    ctx.closePath();
+                    ctx.fillStyle = "rgba(0, 123, 255, 0.15)";
+                    ctx.fill();
+                    ctx.strokeStyle = "rgba(0, 123, 255, 0.7)";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            });
+        }
+    }
+
+    $: if (ctx && img && showZones !== undefined && zones !== undefined) {
+        redraw();
     }
 
 </script>
@@ -204,6 +236,24 @@
             Finish Zone
         </button>
     </div>
+    {#if showNameInput}
+        <div class="flex gap-2 items-center mt-2">
+            <input
+                type="text"
+                bind:value={newZoneName}
+                placeholder="Zone name"
+                class="px-2 py-1 border rounded focus:outline-none"
+                on:keydown={(e) => { if (e.key === 'Enter') saveZone(); }}
+                autofocus
+            />
+            <button
+                class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                on:click={saveZone}
+            >
+                Save Zone
+            </button>
+        </div>
+    {/if}
     <div bind:this={container} class="relative w-full h-auto" style="aspect-ratio: {width} / {height}; max-width: 100%;">
         <img src="/snapshot.jpg" alt="Snapshot" class="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable="false" style="z-index:1;" />
         <canvas
