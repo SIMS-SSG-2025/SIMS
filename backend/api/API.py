@@ -7,6 +7,8 @@ import cv2
 from device.utils.logger import get_logger
 from ..db.database_manager import DatabaseManager
 from pathlib import Path
+import json
+import time
 app = FastAPI()
 snapshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),"device", "snapshot")
 db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db","events.db")
