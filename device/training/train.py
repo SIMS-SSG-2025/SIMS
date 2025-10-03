@@ -81,7 +81,7 @@ if config["training"]["train_from_checkpoint"]:
     with open(MODEL_CONFIG, 'r') as file:
         model_config = yaml.safe_load(file)
     num_classes = model_config["nc"]
-    model = DetectionModel(cfg=model_config, nc=num_classes)
+    model = DetectionModel(cfg=model_config, nc=num_classes, verbose=True)
     model.load_state_dict(torch.load(MODEL_CHECKPOINT, map_location=lambda storage, loc: storage))
     print("continue from checkpoint")
 else:

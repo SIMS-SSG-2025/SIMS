@@ -1,29 +1,62 @@
-from deep_sort_realtime.deepsort_tracker import DeepSort
+from types import SimpleNamespace
+from ultralytics.trackers.bot_sort import BOTSORT
+import numpy as np
+
+class DetectionResults:
+    def __init__(self, dets):
+        flat_dets = []
+        for det in dets:
+            bbox, conf, cls = det
+            flat_dets.append(list(bbox) + [conf, cls])
+
+        dets_array = np.array(flat_dets, dtype=np.float32)
+
+        if dets_array.size == 0:
+            self.xywh = np.zeros((0, 4), dtype=np.float32)
+            self.conf = np.zeros((0,), dtype=np.float32)
+            self.cls = np.zeros((0,), dtype=int)
+        else:
+            self.xywh = dets_array[:, :4]
+            self.conf = dets_array[:, 4]
+            self.cls = dets_array[:, 5].astype(int)
 
 class Tracker:
-    def __init__(self, class_names):
-        self.tracker = DeepSort(max_age=60, n_init=10, max_cosine_distance=0.1, max_iou_distance=0.9)
+    def __init__(self, class_names, cam_fps, with_reid=True, reid_model="yolov8n.pt"):
+        args = SimpleNamespace(
+            track_buffer=360,
+            track_high_thresh=0.5,
+            track_low_thresh=0.1,
+            new_track_thresh=0.4,
+            match_thresh=0.7,
+            fuse_score=True,
+            gmc_method="none",
+            with_reid=with_reid,
+            model=reid_model,
+            proximity_thresh=0.5,
+            appearance_thresh=0.25
+        )
+
+        self.tracker = BOTSORT(args, frame_rate=int(cam_fps))
+        # self.tracker.encoder.model.device.to("cuda") to gpu
         self.class_names = class_names
 
     def update(self, detections, frame):
-
-        tracks = self.tracker.update_tracks(detections, frame=frame)
+        height, width, _ = frame.shape
+        tracks = self.tracker.update(detections, frame)
 
         tracked_objects = []
         for track in tracks:
-            if not track.is_confirmed():
-                continue
-
-            bbox = track.to_tlwh()
-            x, y, w, h = map(int, bbox)
-            cls_id = track.get_det_class()
-            class_name = self.class_names[cls_id]
-            track_id = track.track_id
-
+            x1, y1, x2, y2, track_id, conf, cls_id, _ = track
+            class_name = self.class_names[int(cls_id)]
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(width, x2)
+            y2 = min(height, y2)
             tracked_objects.append({
-                "track_id": track_id,
-                "bbox": [x, y, w, h],
-                "class": class_name
+                "track_id": int(track_id),
+                "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "class": class_name,
+                "conf": float(conf)
             })
 
         return tracked_objects
