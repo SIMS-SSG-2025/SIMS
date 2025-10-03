@@ -1,5 +1,7 @@
 <script lang="ts">
     export let onFinishZone: (points: { x: number; y: number }[], name: string) => void;
+    export let width: number = 640;
+    export let height: number = 360;
     import { onMount } from "svelte";
 
     interface Point {
@@ -9,6 +11,9 @@
     let canvas: HTMLCanvasElement;
     let ctx: CanvasRenderingContext2D;
     let img: HTMLImageElement;
+    let container: HTMLDivElement;
+    let renderedWidth = width;
+    let renderedHeight = height;
     let drawing: boolean = false;
     let points: Point[] = [];
     let draggingPointsIndex: number | null = null;
@@ -18,17 +23,53 @@
         img = new Image();
         img.src = "/snapshot.jpg";
         img.onload = () => {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
+            updateCanvasSize();
+            drawImageContained();
+        };
+        window.addEventListener('resize', updateCanvasSize);
+        return () => {
+            window.removeEventListener('resize', updateCanvasSize);
         };
     })
 
+    function updateCanvasSize() {
+        if (container && img) {
+            // Get the container's size (which matches the image's rendered size)
+            renderedWidth = container.clientWidth;
+            renderedHeight = container.clientHeight;
+            canvas.width = renderedWidth;
+            canvas.height = renderedHeight;
+            drawImageContained();
+            redraw();
+        }
+    }
+
+    function drawImageContained() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!img.complete) return;
+        const imgAspect = img.width / img.height;
+        const canvasAspect = canvas.width / canvas.height;
+        let drawWidth, drawHeight, offsetX, offsetY;
+        if (imgAspect > canvasAspect) {
+            drawWidth = canvas.width;
+            drawHeight = canvas.width / imgAspect;
+            offsetX = 0;
+            offsetY = (canvas.height - drawHeight) / 2;
+        } else {
+            drawHeight = canvas.height;
+            drawWidth = canvas.height * imgAspect;
+            offsetX = (canvas.width - drawWidth) / 2;
+            offsetY = 0;
+        }
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    }
+
     function getMousePos(event: MouseEvent): Point {
         const rect = canvas.getBoundingClientRect();
+        // Map mouse position to canvas coordinates
         return {
-            x: event.clientX - rect.left,
-            y: event.clientY - rect.top
+            x: (event.clientX - rect.left) * (canvas.width / rect.width),
+            y: (event.clientY - rect.top) * (canvas.height / rect.height)
         };
     }
 
@@ -113,8 +154,7 @@
     }
 
     function redraw(): void {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
+        drawImageContained();
 
         if (points.length > 0) {
             // Draw filled polygon if 3+ points
@@ -145,7 +185,7 @@
 
 </script>
 
-<div>
+<div class="flex flex-col items-center">
     <div class="flex gap-2 mt-4 mb-2">
         <button
             class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -164,13 +204,18 @@
             Finish Zone
         </button>
     </div>
-    <canvas
-        bind:this={canvas}
-        on:click={handleClick}
-        on:mousedown={handleMouseDown}
-        on:mousemove={handleMouseMove}
-        on:mouseup={handleMouseUp}
-        class="border border-gray-300 rounded shadow"
-        style="cursor: crosshair;"
-    ></canvas>
+    <div bind:this={container} class="relative w-full h-auto" style="aspect-ratio: {width} / {height}; max-width: 100%;">
+        <img src="/snapshot.jpg" alt="Snapshot" class="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable="false" style="z-index:1;" />
+        <canvas
+            bind:this={canvas}
+            width={renderedWidth}
+            height={renderedHeight}
+            on:click={handleClick}
+            on:mousedown={handleMouseDown}
+            on:mousemove={handleMouseMove}
+            on:mouseup={handleMouseUp}
+            class="border border-gray-300 rounded shadow absolute inset-0"
+            style="cursor: crosshair; width: 100%; height: 100%; background: transparent; z-index:2;"
+        ></canvas>
+    </div>
 </div>
