@@ -6,8 +6,6 @@ class DatabaseManager:
     def __init__(self,db_path):
         self.db_path = db_path
 
-
-
     def insert_object(self,object_id,object_type):
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
