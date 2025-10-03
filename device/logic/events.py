@@ -4,11 +4,12 @@ import datetime
 
 
 class EventManager:
-    def __init__(self, logger):
+    def __init__(self, logger, db_queue):
         self.active_tracks = []
         self.zones = []  # Predefined zones can be added here
-        db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
-        self.database = DatabaseManager(db_path=db_path)
+        #db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
+        self.db_queue = db_queue
+        #self.database = DatabaseManager(db_path=db_path)
         self.logger = logger
 
     def handle_detections(self, tracked_objects, ppe_detections):
@@ -27,7 +28,7 @@ class EventManager:
             if track_id not in self.active_tracks:
                 # New object detected
                 self.active_tracks.append(track_id)
-                if obj["class"] == "person":
+                if obj["class"] == "Person":
                     obj["ppe"] = []
                     for ppe in ppe_detections:
                         if self._is_overlapping(obj["bbox"], ppe["bbox"]):
@@ -68,20 +69,23 @@ class EventManager:
 
     def _create_object(self, obj):
         """ Create an object in the database. """
-        object = {
-            "track_id": obj["track_id"],
-            "type": obj["class"],
-        }
-        print(f"Object created: {object}")
 
-        self.logger.info(f"[DB] Object created: {object}")
-        self.database.insert_object(object_id=object["track_id"], object_type=object["type"])
+        object_msg = {
+            "action": "insert_object",
+            "object_id": obj["track_id"],
+            "object_type": obj["class"],
+        }
+
+        self.logger.info(f"[DB] Object created: {object_msg}")
+        self.db_queue.put(object_msg)
+        print(f"Object created: {object_msg}")
 
 
     def _create_event(self, obj):
         """ Create an event in the database. """
 
-        event = {
+        event_msg = {
+            "action": "insert_event",
             "object_id": obj["track_id"],
             "zone_id": None,
             "location": "lager1",
@@ -89,14 +93,6 @@ class EventManager:
             "vest": True if "vest" in obj.get("ppe", []) else False,
             "time": datetime.datetime.now().isoformat(),
         }
-        print(f"Event created: {event}")
-
-        self.logger.info(f"[DB] Event created: {event}")
-        self.database.insert_events(
-            object_id=event["object_id"],
-            zone_id=event["zone_id"],
-            location=event["location"],
-            helmet=event["helmet"],
-            vest=event["vest"],
-            time=event["time"]
-        )
+        self.logger.info(f"[DB] Event created: {event_msg}")
+        self.db_queue.put(event_msg)
+        print(f"Event created: {event_msg}")
