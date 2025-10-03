@@ -41,3 +41,17 @@ class DatabaseManager:
         cursor.execute("""INSERT INTO zones (coords,name) VALUES (?,?)""", (coords_json,name))
         sqlconn.commit()
         sqlconn.close()
+
+    def fetch_zones(self):
+        sqlconn = sqlite3.connect(self.db_path)
+        cursor = sqlconn.cursor()
+        cursor.execute("SELECT * from zones")
+        rows = cursor.fetchall()
+        sqlconn.close()
+
+        zones = []
+        for row in rows:
+            zone_id,coords_json,name = row
+            coords = json.loads(coords_json)
+            zones.append({"zone_id":zone_id,"coords":coords,"name":name})
+        return zones
