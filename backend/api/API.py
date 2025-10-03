@@ -4,9 +4,9 @@ import sqlite3
 from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import cv2
-import json
+from device.utils.logger import get_logger
 from ..db.database_manager import DatabaseManager
-
+from pathlib import Path
 app = FastAPI()
 snapshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),"device", "snapshot")
 db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db","events.db")
@@ -55,3 +55,15 @@ def receive_zones(zone_data: dict):
         return {"status": "error", "message": "No points provided"}
     db_manager.insert_zone(points, name)
     return {"status": "success", "message": "Zone data received"}
+
+
+
+
+@app.get("/logs")
+def get_logs():
+    log_path = Path(__file__).resolve().parent.parent.parent / "device" / "logs" / "device.log"
+    if log_path.exists():
+        with open(log_path, "r") as f:
+            lines = f.read().splitlines()
+            return {"logs": lines}
+    return {"logs": []}
