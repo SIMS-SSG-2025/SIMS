@@ -1,29 +1,10 @@
 import sqlite3
 import queue
+from backend.db.database_manager import DatabaseManager
 
 def db_worker(db_queue, stop_event, db_path="backend/db/events.db"):
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    cursor = conn.cursor()
+    db_manager = DatabaseManager(db_path)
 
-    # Ensure tables exist (or move this to migrations)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS object (
-        id INTEGER PRIMARY KEY,
-        type TEXT
-    )
-    """)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS events (
-        id INTEGER PRIMARY KEY,
-        object_id INTEGER,
-        zone_id INTEGER,
-        location TEXT,
-        helmet BOOLEAN,
-        vest BOOLEAN,
-        time TEXT
-    )
-    """)
-    conn.commit()
 
     print("DB thread started.")
     while not stop_event.is_set() or not db_queue.empty():
@@ -33,19 +14,16 @@ def db_worker(db_queue, stop_event, db_path="backend/db/events.db"):
             continue
 
         if msg["action"] == "insert_object":
-            cursor.execute("INSERT INTO object (id, type) VALUES (?, ?)",
-                           (msg["object_id"], msg["object_type"]))
-            conn.commit()
+            db_manager.insert_object(msg["object_id"], msg["type"])
 
         elif msg["action"] == "insert_event":
-            cursor.execute("""
-            INSERT INTO events (object_id, zone_id, location, helmet, vest, time)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                msg["object_id"], msg["zone_id"], msg["location"],
-                msg["helmet"], msg["vest"], msg["time"]
-            ))
-            conn.commit()
+            db_manager.insert_events(
+                msg["object_id"],
+                msg["zone_id"],
+                msg["location"],
+                int(msg["helmet"]),
+                int(msg["vest"]),
+                msg["time"]
+            )
 
-    conn.close()
     print("DB thread exited.")

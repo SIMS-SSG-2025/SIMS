@@ -55,7 +55,7 @@ if __name__ == "__main__":
             continue
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         detections = run_inference(rgb_frame, model)
-        trackable_classes = ["Person", "vehicle", "Hardhat", "NO-Hardhat"]
+        trackable_classes = ["Person", "vehicle"]
         ppe_classes = ["helmet", "vest"]
         detections_for_tracking = [d for d in detections if class_names[d[-1]] in trackable_classes]
         ppe_detections = [d for d in detections if class_names[d[-1]] in ppe_classes]

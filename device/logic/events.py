@@ -73,7 +73,7 @@ class EventManager:
         object_msg = {
             "action": "insert_object",
             "object_id": obj["track_id"],
-            "object_type": obj["class"],
+            "type": obj["class"],
         }
 
         self.logger.info(f"[DB] Object created: {object_msg}")

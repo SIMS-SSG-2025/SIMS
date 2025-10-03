@@ -4,3 +4,7 @@
 2025-10-03 11:14:59 - Inference - INFO - [DB] Object created: {'action': 'insert_object', 'object_id': '2', 'object_type': 'Person'}
 2025-10-03 11:17:48 - Inference - INFO - [DB] Object created: {'action': 'insert_object', 'object_id': '2', 'object_type': 'Person'}
 2025-10-03 11:17:50 - Inference - INFO - [DB] Object created: {'action': 'insert_object', 'object_id': '4', 'object_type': 'Hardhat'}
+2025-10-03 11:29:23 - Inference - INFO - [DB] Object created: {'action': 'insert_object', 'object_id': '1', 'object_type': 'Person'}
+2025-10-03 11:32:11 - Inference - INFO - [DB] Object created: {'action': 'insert_object', 'object_id': '1', 'object_type': 'Person'}
+2025-10-03 11:36:20 - Inference - INFO - [DB] Object created: {'action': 'insert_object', 'object_id': '1', 'object_type': 'Person'}
+2025-10-03 11:37:07 - Inference - INFO - [DB] Object created: {'action': 'insert_object', 'object_id': '1', 'type': 'Person'}
