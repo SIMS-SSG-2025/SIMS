@@ -16,12 +16,12 @@ class DatabaseManager:
         sqlconn.close()
 
 
-    def insert_events(self,object_id,zone_id,location,has_helmet,has_vest,time):
+    def insert_events(self,object_id,zone_id,has_helmet,has_vest,time):
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
-        cursor.execute("""INSERT INTO events (object_id,zone_id,location,has_helmet,has_vest,time)
+        cursor.execute("""INSERT INTO events (object_id,zone_id,has_helmet,has_vest,time)
         VALUES (?,?,?,?,?,?)""",
-        (object_id,zone_id,location,has_helmet,has_vest,time))
+        (object_id,zone_id,has_helmet,has_vest,time))
         sqlconn.commit()
         sqlconn.close()
 
