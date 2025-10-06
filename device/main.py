@@ -2,19 +2,55 @@ import cv2
 from ultralytics import YOLO
 import time
 
-from device.inference.inference import run_inference
-from device.inference.tracker import Tracker, DetectionResults
-from device.logic.events import EventManager
-
 import threading, queue
 import yaml
 from ultralytics.nn.tasks import DetectionModel
 import torch
 from .utils.logger import get_logger
 from .utils.db_worker import db_worker
-
 from device.training.dataset.dataset_transform import load_class_mapping
 
+from device.DeviceRuntime import DeviceRuntime
+
+if __name__ == "__main__":
+    # -- Setup DB Thread --
+    db_queue = queue.Queue(maxsize=100)
+    response_queue = queue.Queue()
+    stop_event = threading.Event()
+
+    db_thread = threading.Thread(target=db_worker, args=(db_queue, stop_event))
+    db_thread.start()
+
+    device_runtime = DeviceRuntime(db_queue)
+    while True:
+        try:
+            db_queue.put({"action": "get_status", "response": response_queue})
+            try:
+                run_flag = response_queue.get(timeout=0.2)
+            except queue.Empty:
+                # Maybe log a warning here about no response
+                run_flag = False
+                time.sleep(1)
+                continue
+
+            if run_flag:
+                device_runtime.start()
+            else:
+                print("Waiting for run flag...")
+                time.sleep(0.5)
+
+        except KeyboardInterrupt:
+            stop_event.set()
+            device_runtime.stop()
+            break
+
+    device_runtime.stop()
+    stop_event.set()
+    db_thread.join()
+
+
+
+"""
 if __name__ == "__main__":
     # -- Setup DB Thread --
     db_queue = queue.Queue(maxsize=100)
@@ -73,17 +109,18 @@ if __name__ == "__main__":
                     cv2.putText(frame, f"Track ID: {track_id} {cls_name}", (x1, y1-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
-            current_time = time.time()
-            fps = 1 / (current_time - prev_time)
-            prev_time = current_time
-            cv2.putText(frame, f"FPS: {fps:.0f}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.imshow("Camera feed", frame)
+        current_time = time.time()
+        fps = 1 / (current_time - prev_time)
+        prev_time = current_time
+        cv2.putText(frame, f"FPS: {fps:.0f}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.imshow("Camera feed", frame)
 
-            if cv2.waitKey(1) == ord('q'):
-                break
+        if cv2.waitKey(1) == ord('q'):
+            break
 
     cam.release()
     cv2.destroyAllWindows()
     stop_event.set()
     db_thread.join()
+ """
