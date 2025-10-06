@@ -49,11 +49,12 @@ if __name__ == "__main__":
             break
 
     device_runtime.stop()
+    stop_event.set()
     db_thread.join()
 
 
 
-
+"""
 if __name__ == "__main__":
     # -- Setup DB Thread --
     db_queue = queue.Queue(maxsize=100)
@@ -126,3 +127,4 @@ if __name__ == "__main__":
     cv2.destroyAllWindows()
     stop_event.set()
     db_thread.join()
+ """

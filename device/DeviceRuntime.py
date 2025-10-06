@@ -68,6 +68,7 @@ class DeviceRuntime:
                 prev_time = now
 
             if cv2.waitKey(1) == ord('q'):
+                self.running = False
                 break
 
 
