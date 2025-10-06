@@ -4,12 +4,8 @@ import sqlite3
 from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import cv2
-from starlette.responses import StreamingResponse
-
 from ..db.database_manager import DatabaseManager
 from pathlib import Path
-import json
-import time
 app = FastAPI()
 snapshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),"device", "snapshot")
 db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db","events.db")
@@ -72,7 +68,7 @@ def get_logs():
     return {"logs": []}
 
 
-
+"""
 @app.get("/zones/stream")
 def stream_zones():
     def event_stream():
@@ -86,3 +82,24 @@ def stream_zones():
                 yield f" data: {json.dumps(zones)}\n\n"
             time.sleep(1)
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+"""
+
+@app.get("/zones/fetch_all")
+def get_zones():
+    zones = DatabaseManager.fetch_all_zones()
+    return zones
+
+@app.get("/system/start")
+def start_system():
+    db_manager.set_system_config(True)
+    return {"status": "Ai starting"}
+
+@app.get("/system/stop")
+def stop_system():
+    db_manager.set_system_config(False)
+    return {"status": "Ai stopping"}
+
+@app.get("/system/status")
+def get_status():
+    status = db_manager.get_ai_running()
+    return {"status": status}

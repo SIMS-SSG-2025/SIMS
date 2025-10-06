@@ -16,12 +16,12 @@ class DatabaseManager:
         sqlconn.close()
 
 
-    def insert_events(self,object_id,zone_id,has_helmet,has_vest,time):
+    def insert_events(self,object_id,zone_id,location_id,has_helmet,has_vest,time):
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
-        cursor.execute("""INSERT INTO events (object_id,zone_id,has_helmet,has_vest,time)
-        VALUES (?,?,?,?,?,?)""",
-        (object_id,zone_id,has_helmet,has_vest,time))
+        cursor.execute("""INSERT INTO events (object_id,zone_id,location_id,has_helmet,has_vest,time)
+        VALUES (?,?,?,?,?,?,?)""",
+        (object_id,zone_id,location_id,has_helmet,has_vest,time))
         sqlconn.commit()
         sqlconn.close()
 
@@ -34,15 +34,15 @@ class DatabaseManager:
         sqlconn.close()
         return rows
 
-    def insert_zone(self, points, name):
+    def insert_zone(self, points,name,location_id):
         coords_json = json.dumps(points)
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
-        cursor.execute("""INSERT INTO zones (coords,name) VALUES (?,?)""", (coords_json,name))
+        cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json,name))
         sqlconn.commit()
         sqlconn.close()
 
-    def fetch_zones(self):
+    def fetch_all_zones(self):
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
         cursor.execute("SELECT * from zones")
@@ -51,7 +51,24 @@ class DatabaseManager:
 
         zones = []
         for row in rows:
-            zone_id,coords_json,name = row
+            zone_id,location_id,coords_json,name = row
             coords = json.loads(coords_json)
-            zones.append({"zone_id":zone_id,"coords":coords,"name":name})
+            zones.append({"zone_id":zone_id,"location_id":location_id,"coords":coords,"name":name})
         return zones
+
+    def set_ai_running(self,value: bool):
+        sqlconn = sqlite3.connect(self.db_path)
+        cursor = sqlconn.cursor()
+        cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0))
+        sqlconn.commit()
+        sqlconn.close()
+
+    def get_ai_running(self) -> bool:
+        sqlconn = sqlite3.connect(self.db_path)
+        cursor = sqlconn.cursor()
+        cursor.execute("SELECT ai_running FROM system_config WHERE system_config_id=1")
+        result = cursor.fetchone()
+        cursor.close()
+        if result:
+            return result[0] == 1
+        return False
