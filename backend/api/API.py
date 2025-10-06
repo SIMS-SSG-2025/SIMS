@@ -4,9 +4,8 @@ import sqlite3
 from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import cv2
-import json
 from ..db.database_manager import DatabaseManager
-
+from pathlib import Path
 app = FastAPI()
 snapshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),"device", "snapshot")
 db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db","events.db")
@@ -55,3 +54,52 @@ def receive_zones(zone_data: dict):
         return {"status": "error", "message": "No points provided"}
     db_manager.insert_zone(points, name)
     return {"status": "success", "message": "Zone data received"}
+
+
+
+
+@app.get("/logs")
+def get_logs():
+    log_path = Path(__file__).resolve().parent.parent.parent / "device" / "logs" / "device.log"
+    if log_path.exists():
+        with open(log_path, "r") as f:
+            lines = f.read().splitlines()
+            return {"logs": lines}
+    return {"logs": []}
+
+
+"""
+@app.get("/zones/stream")
+def stream_zones():
+    def event_stream():
+        last_id = set()
+        while True:
+            zones = DatabaseManager.fetch_zones()
+            current_id = set([z['zone_id'] for z in zones])
+
+            if current_id != last_id:
+                last_id = current_id
+                yield f" data: {json.dumps(zones)}\n\n"
+            time.sleep(1)
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+"""
+
+@app.get("/zones/fetch_all")
+def get_zones():
+    zones = DatabaseManager.fetch_all_zones()
+    return zones
+
+@app.get("/system/start")
+def start_system():
+    db_manager.set_system_config(True)
+    return {"status": "Ai starting"}
+
+@app.get("/system/stop")
+def stop_system():
+    db_manager.set_system_config(False)
+    return {"status": "Ai stopping"}
+
+@app.get("/system/status")
+def get_status():
+    status = db_manager.get_ai_running()
+    return {"status": status}
