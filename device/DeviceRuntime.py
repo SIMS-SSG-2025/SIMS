@@ -58,12 +58,12 @@ class DeviceRuntime:
             detections_for_tracking = [d for d in detections if self.class_names[d[-1]] in trackable_classes]
             results = DetectionResults(detections_for_tracking)
             ppe_detections = [d for d in detections if self.class_names[d[-1]] in ppe_classes]
-            tracked_objects = self.tracker.update(results, frame)
+            tracked_objects, in_frame_objects = self.tracker.update(results, frame)
             self.event_manager.handle_detections(tracked_objects, ppe_detections)
             current_time = time.time()
             fps = 1 / (current_time - prev_time_fps)
             prev_time_fps = current_time
-            self._visualize(tracked_objects, frame, fps)
+            self._visualize(in_frame_objects, frame, fps)
 
             # Periodically check DB for stop flag
             now = time.time()

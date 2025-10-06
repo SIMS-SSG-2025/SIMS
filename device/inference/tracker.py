@@ -21,7 +21,7 @@ class DetectionResults:
             self.cls = dets_array[:, 5].astype(int)
 
 class Tracker:
-    def __init__(self, class_names, cam_fps, with_reid=True, reid_model="yolov8n.pt"):
+    def __init__(self, class_names, cam_fps, with_reid=True, reid_model="yolov8n-cls.pt"):
         args = SimpleNamespace(
             track_buffer=360,
             track_high_thresh=0.5,
@@ -42,21 +42,68 @@ class Tracker:
 
     def update(self, detections, frame):
         height, width, _ = frame.shape
-        tracks = self.tracker.update(detections, frame)
+        _ = self.tracker.update(detections, frame)
+        current_frame_id = self.tracker.frame_id
 
         tracked_objects = []
-        for track in tracks:
-            x1, y1, x2, y2, track_id, conf, cls_id, _ = track
-            class_name = self.class_names[int(cls_id)]
+
+        alive_tracks = self.tracker.tracked_stracks + self.tracker.lost_stracks
+
+        frame_age_threshold = 5
+
+        for track in alive_tracks:
+            track_age = current_frame_id - track.start_frame
+
+            if not track.is_activated or track_age < frame_age_threshold:
+                continue
+
+            tlwh = track.tlwh
+            x1, y1, w, h= tlwh
+            x2 = x1 + w
+            y2 = y1 + h
+
             x1 = max(0, x1)
             y1 = max(0, y1)
             x2 = min(width, x2)
             y2 = min(height, y2)
+
+            class_name = self.class_names[int(track.cls)]
+
             tracked_objects.append({
-                "track_id": int(track_id),
+                "track_id": int(track.track_id),
                 "bbox": [int(x1), int(y1), int(x2), int(y2)],
                 "class": class_name,
-                "conf": float(conf)
+                "conf": float(track.score)
             })
 
-        return tracked_objects
+        in_frame_tracks = []
+
+        for track in self.tracker.tracked_stracks:
+            track_age = current_frame_id - track.start_frame
+
+            if not track.is_activated or track_age < frame_age_threshold:
+                continue
+
+
+            tlwh = track.tlwh
+            x1, y1, w, h= tlwh
+            x2 = x1 + w
+            y2 = y1 + h
+
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(width, x2)
+            y2 = min(height, y2)
+
+            class_name = self.class_names[int(track.cls)]
+
+            in_frame_tracks.append({
+                "track_id": int(track.track_id),
+                "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "class": class_name,
+                "conf": float(track.score)
+            })
+
+
+
+        return tracked_objects, in_frame_tracks
