@@ -44,6 +44,7 @@ class DeviceRuntime:
         self.running = True
         self._update_config()
         prev_time = time.time()
+        prev_time_fps = time.time()
         CHECK_INTERVAL = 5
         while self.running:
             # check for stop signal
@@ -59,7 +60,10 @@ class DeviceRuntime:
             ppe_detections = [d for d in detections if self.class_names[d[-1]] in ppe_classes]
             tracked_objects = self.tracker.update(results, frame)
             self.event_manager.handle_detections(tracked_objects, ppe_detections)
-            self._visualize(tracked_objects, frame, prev_time)
+            current_time = time.time()
+            fps = 1 / (current_time - prev_time_fps)
+            prev_time_fps = current_time
+            self._visualize(tracked_objects, frame, fps)
 
             # Periodically check DB for stop flag
             now = time.time()
@@ -68,7 +72,7 @@ class DeviceRuntime:
                 prev_time = now
 
             if cv2.waitKey(1) == ord('q'):
-                self.running = False
+                self.stop()
                 break
 
 
@@ -83,6 +87,7 @@ class DeviceRuntime:
 
     def _check_status(self):
         self.db_queue.put({"action": "get_status", "response": self.response_queue})
+        print("Checking Run Status")
         try:
             run_flag = self.response_queue.get_nowait()
             if run_flag is False:
@@ -103,7 +108,7 @@ class DeviceRuntime:
         self.model.load_state_dict(torch.load(model_path, map_location=lambda storage, loc: storage))
         self.model.eval()
 
-    def _visualize(self, tracked_objects, frame, prev_time):
+    def _visualize(self, tracked_objects, frame, fps):
         ## -- Visualization --
         if tracked_objects:
             for obj in tracked_objects:
@@ -115,9 +120,7 @@ class DeviceRuntime:
                     cv2.putText(frame, f"Track ID: {track_id} {cls_name}", (x1, y1-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
-        current_time = time.time()
-        fps = 1 / (current_time - prev_time)
-        prev_time = current_time
+
         cv2.putText(frame, f"FPS: {fps:.0f}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.imshow("Camera feed", frame)

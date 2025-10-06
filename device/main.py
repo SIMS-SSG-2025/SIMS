@@ -2,10 +2,6 @@ import cv2
 from ultralytics import YOLO
 import time
 
-from device.inference.inference import run_inference
-from device.inference.tracker import Tracker, DetectionResults
-from device.logic.events import EventManager
-
 import threading, queue
 import yaml
 from ultralytics.nn.tasks import DetectionModel
@@ -14,7 +10,7 @@ from .utils.logger import get_logger
 from .utils.db_worker import db_worker
 from device.training.dataset.dataset_transform import load_class_mapping
 
-from DeviceRuntime import DeviceRuntime
+from device.DeviceRuntime import DeviceRuntime
 
 if __name__ == "__main__":
     # -- Setup DB Thread --

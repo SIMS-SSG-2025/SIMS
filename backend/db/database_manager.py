@@ -57,7 +57,7 @@ class DatabaseManager:
     def set_ai_running(self,value: bool):
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
-        cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0))
+        cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0,))
         sqlconn.commit()
         sqlconn.close()
 

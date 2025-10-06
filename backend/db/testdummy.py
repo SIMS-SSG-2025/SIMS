@@ -1,8 +1,10 @@
 import datetime
 from database_manager import DatabaseManager
+import os
 
+db_path = os.path.join(os.path.dirname(__file__), "events.db")
 
-db = DatabaseManager("events.db")
+db = DatabaseManager(db_path)
 """
 db.insert_object(3,"Oskar")
 db.insert_object(4,"Malcolm")
@@ -30,8 +32,10 @@ db.insert_events(
 
 """
 
+db.set_ai_running(True)
 
-eventlist = db.get_event()
+
+""" eventlist = db.get_event()
 
 for event in eventlist:
     event_id,object_id,zone_id,time,has_helmet,has_vest,location = event
@@ -39,4 +43,4 @@ for event in eventlist:
     print(f"Event {event_id}:"
           f"Object={object_id}:, Zone={zone_id},Time={time},"
           f"Helmet={bool(has_helmet)}, Vest={bool(has_vest)}",
-          f"Location={location}")
+          f"Location={location}") """
