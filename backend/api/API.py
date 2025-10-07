@@ -33,7 +33,6 @@ def fetch_events():
     return rows
 
 @app.get("/snapshot")
-
 def take_snapshot():
     cam = cv2.VideoCapture(0)
     ret, frame = cam.read()
@@ -41,10 +40,15 @@ def take_snapshot():
 
     if not ret:
         print("failed to capture")
+        return {"error": "Failed to capture image from camera"}
+
+    # Ensure the snapshot directory exists
+    os.makedirs(snapshot_path, exist_ok=True)
 
     filename = "snapshot.png"
     file_path = os.path.join(snapshot_path, filename)
     cv2.imwrite(file_path, frame)
+    print(f"Snapshot saved to {file_path}")
     return FileResponse(file_path, media_type="image/png")
 
 @app.post("/zones")
