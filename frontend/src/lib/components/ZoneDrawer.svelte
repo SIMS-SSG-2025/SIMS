@@ -4,9 +4,6 @@
     export let height: number = 360;
     export let zones: { points: { x: number; y: number }[], name: string }[] = [];
     export let showZones: boolean = true;
-    export let imageSrc: string = "/snapshot.jpg";
-    // When readOnly is true, drawing/interaction is disabled and only existing zones are shown
-    export let readOnly: boolean = false;
     import { onMount } from "svelte";
 
     interface Point {
@@ -28,11 +25,8 @@
 
     onMount(() => {
         ctx = canvas.getContext("2d")!;
-        // Initialize canvas with provided defaults to avoid zero-size on first render
-        canvas.width = renderedWidth || width;
-        canvas.height = renderedHeight || height;
         img = new Image();
-        img.src = imageSrc;
+        img.src = "/snapshot.jpg";
         img.onload = () => {
             updateCanvasSize();
             drawImageContained();
@@ -43,36 +37,19 @@
         };
     })
 
-    $: if (img && imageSrc && img.src !== imageSrc) {
-        // Reload image when source changes (e.g., new snapshot blob URL)
-        img.src = imageSrc;
-        img.onload = () => {
-            updateCanvasSize();
-            drawImageContained();
-        };
-    }
-
     function updateCanvasSize() {
         if (container && img) {
             // Get the container's size (which matches the image's rendered size)
-            const rect = container.getBoundingClientRect();
-            const w = container.clientWidth || rect.width;
-            const h = container.clientHeight || rect.height;
-            // Only update if we measured a positive size; otherwise keep previous (fallback to prop width/height)
-            if (w > 0 && h > 0) {
-                renderedWidth = Math.max(1, Math.round(w));
-                renderedHeight = Math.max(1, Math.round(h));
-                canvas.width = renderedWidth;
-                canvas.height = renderedHeight;
-            }
+            renderedWidth = container.clientWidth;
+            renderedHeight = container.clientHeight;
+            canvas.width = renderedWidth;
+            canvas.height = renderedHeight;
             drawImageContained();
             redraw();
         }
     }
 
     function drawImageContained() {
-        if (!ctx) return;
-        if (!canvas || canvas.width === 0 || canvas.height === 0) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (!img.complete) return;
         const imgAspect = img.width / img.height;
@@ -106,7 +83,6 @@
     }
 
     function handleMouseDown(event: MouseEvent): void {
-        if (readOnly) return;
         const pos = getMousePos(event);
         const idx = findPointIndex(pos);
         if (idx !== -1) {
@@ -115,7 +91,6 @@
     }
 
     function handleMouseMove(event: MouseEvent): void {
-        if (readOnly) return;
         const pos = getMousePos(event);
         const idx = findPointIndex(pos);
         if (draggingPointsIndex !== null) {
@@ -129,7 +104,6 @@
     }
 
     function handleMouseUp(): void {
-        if (readOnly) return;
         if (draggingPointsIndex !== null) {
             points = orderPolygonPoints(points);
             redraw();
@@ -138,7 +112,6 @@
     }
 
     function handleClick(event: MouseEvent): void {
-        if (readOnly) return;
         const pos = getMousePos(event);
         // Only add a point if not clicking on an existing point
         if (findPointIndex(pos) !== -1) return;
@@ -152,7 +125,6 @@
     }
 
     function handleUndo(): void {
-        if (readOnly) return;
         points.pop();
         console.log(points);
         showNameInput = false;
@@ -160,7 +132,6 @@
     }
 
     function handleFinish(): void {
-        if (readOnly) return;
         if(points.length > 2) {
             showNameInput = true;
             newZoneName = "";
@@ -172,7 +143,6 @@
     }
 
     function saveZone() {
-        if (readOnly) return;
         const normalizedPoints = points.map(p => ({
             x: p.x / canvas.width,
             y: p.y / canvas.height
@@ -247,8 +217,7 @@
 
 </script>
 
-    <div class="flex flex-col items-center">
-    {#if !readOnly}
+<div class="flex flex-col items-center">
     <div class="flex gap-2 mt-4 mb-2">
         <button
             class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium shadow focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -267,8 +236,7 @@
             Finish Zone
         </button>
     </div>
-    {/if}
-    {#if showNameInput && !readOnly}
+    {#if showNameInput}
         <div class="flex gap-2 items-center mt-2">
             <input
                 type="text"
@@ -276,6 +244,7 @@
                 placeholder="Zone name"
                 class="px-2 py-1 border rounded focus:outline-none"
                 on:keydown={(e) => { if (e.key === 'Enter') saveZone(); }}
+                autofocus
             />
             <button
                 class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
@@ -285,9 +254,8 @@
             </button>
         </div>
     {/if}
-    <div bind:this={container} class="relative w-full h-full bg-transparent" style="max-width: 100%; height: 100%;">
-        <img src={imageSrc} alt="Snapshot" class="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable="false" style="z-index:1; border-radius:8px;" />
-        {#if !readOnly}
+    <div bind:this={container} class="relative w-full h-auto" style="aspect-ratio: {width} / {height}; max-width: 100%;">
+        <img src="/snapshot.jpg" alt="Snapshot" class="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable="false" style="z-index:1;" />
         <canvas
             bind:this={canvas}
             width={renderedWidth}
@@ -296,17 +264,8 @@
             on:mousedown={handleMouseDown}
             on:mousemove={handleMouseMove}
             on:mouseup={handleMouseUp}
-            class="absolute inset-0"
+            class="border border-gray-300 rounded shadow absolute inset-0"
             style="cursor: crosshair; width: 100%; height: 100%; background: transparent; z-index:2;"
         ></canvas>
-        {:else}
-        <canvas
-            bind:this={canvas}
-            width={renderedWidth}
-            height={renderedHeight}
-            class="absolute inset-0"
-            style="pointer-events: none; width: 100%; height: 100%; background: transparent; z-index:2;"
-        ></canvas>
-        {/if}
     </div>
 </div>
