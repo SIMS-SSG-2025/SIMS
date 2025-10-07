@@ -4,6 +4,7 @@
     import LineChart from "$lib/components/LineChart.svelte";
     import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
     import Modal from "$lib/components/modal.svelte";
+    import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
     import { onMount } from "svelte";
 
     let now = new Date();
@@ -16,7 +17,6 @@
     }
 
     let zones: Zone[] = [];
-    let showZones = true;
 
     onMount(() => {
         interval = setInterval(() => {
@@ -31,6 +31,7 @@
         // Modal state
     let showZoneModal = false;
     let showSettingsModal = false;
+    let showConfigModal = false;
 
     function openZoneModal() {
         showZoneModal = true;
@@ -43,6 +44,12 @@
     }
     function closeSettingsModal() {
         showSettingsModal = false;
+    }
+    function openConfigModal() {
+        showConfigModal = true;
+    }
+    function closeConfigModal() {
+        showConfigModal = false;
     }
 
     const ranges: { label: string; value: "day" | "week" | "month" | "all" }[] = [
@@ -59,10 +66,6 @@
     let snapshotURL: string | null = null;
     let loading = false;
     let error: string | null = null;
-
-    function removeZone(index: number) {
-        zones = zones.slice(0, index).concat(zones.slice(index + 1));
-    }
 
     async function fetchSnapshot() {
         loading = true;
@@ -171,6 +174,16 @@
     </div>
 <!-- Right: Export & Settings -->
     <div class="flex items-center gap-2 min-w-[120px] justify-end">
+        <button
+            class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-medium text-sm shadow-sm"
+            on:click={openConfigModal}
+            aria-label="Setup Configuration"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+            </svg>
+            Setup
+        </button>
         <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -245,41 +258,22 @@
         </div>
     </div>
 
-    <Modal open={showZoneModal} onClose={closeZoneModal} modalClass="p-0 w-full max-w-6xl max-h-[95vh]">
-        <span class="text-lg font-semibold text-gray-700 mb-2 mt-6">Draw Zones on Snapshot</span>
-        <div class="flex flex-col items-center p-6 w-full">
-            <div class="w-full" style="max-width:1200px;">
-                <div class="flex items-center mb-4 gap-4">
-                    <button
-                        class="px-4 py-2 rounded-full font-semibold transition bg-blue-600 text-white shadow hover:bg-blue-700"
-                        on:click={() => showZones = !showZones}
-                    >
-                        {showZones ? "Hide Zones" : "Show Zones"}
-                    </button>
-                    <span class="text-gray-600">Zones: {zones.length}</span>
-                    <div class="flex gap-2 flex-wrap">
-                        {#each zones as zone, i}
-                            <span class="inline-flex items-center bg-blue-100 text-blue-800 rounded px-2 py-1 text-xs font-semibold mr-2">
-                                {zone.name || `Zone ${i + 1}`}
-                                <button
-                                    class="ml-1 text-red-500 hover:text-red-700 focus:outline-none"
-                                    title="Remove zone"
-                                    on:click={() => removeZone(i)}
-                                >&#10005;</button>
-                            </span>
-                        {/each}
-                    </div>
-                </div>
-                <ZoneDrawer
-                    onFinishZone={sendZone}
-                    width={1200}
-                    height={675}
-                    {zones}
-                    {showZones}
-                />
-            </div>
+    <Modal open={showZoneModal} onClose={closeZoneModal} modalClass="p-6 w-full max-w-5xl max-h-[90vh] overflow-auto">
+        <div class="w-full">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Draw Zones on Snapshot</h2>
+            <ZoneDrawer
+                onFinishZone={sendZone}
+                width={1200}
+                height={675}
+                bind:zones={zones}
+            />
         </div>
     </Modal>
+
+    <ConfigSetupModal
+        open={showConfigModal}
+        onClose={closeConfigModal}
+    />
 </main>
 
 <style>
@@ -287,75 +281,3 @@
         background: #f9fafb;
     }
 </style>
-
-<!-- <h1>Events</h1>
-
-{#if events.length > 0}
-    <ul>
-    {#each events as e}
-        <li>
-            <span>{e.message}</span>
-        </li>
-    {/each}
-    </ul>
-{:else}
-    <p>No events yet</p>
-{/if} -->
-
-
-<!-- <ZoneDrawer onFinishZone={sendZone} />
- -->
-<!-- <div class="grid grid-cols-2 gap-4 p-4 bg-gray-100 min-h-screen">
-  <div class="card col-span-2"><TablePlaceholder /></div>
-  <div class="card col-span-2"><TablePlaceholder /></div>
-  <div class="card col-span-2"><TablePlaceholder /></div>
-</div> -->
-
-<!-- <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div class="bg-white rounded-lg shadow p-4 h-80">
-    <LineChart />
-  </div>
-</div> -->
-
-<!-- <div class="p-4 space-y-4">
-  <button
-    on:click={fetchSnapshot}
-    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-    disabled={loading}>
-    {#if loading} Loading... {/if}
-    {#if !loading} Take Snapshot {/if}
-  </button>
-
-  {#if error}
-    <p class="text-red-600">Error: {error}</p>
-  {/if}
-
-  {#if snapshotURL}
-    <div class="mt-4">
-      <img src={snapshotURL} alt="Camera snapshot" class="max-w-full rounded shadow" />
-    </div>
-  {/if}
-</div>
-<div class="p-4 space-y-4">
-  <button
-    on:click={loadEvents}
-    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-    disabled={loading}>
-    {#if loading} Loading... {/if}
-    {#if !loading} Load Events {/if}
-  </button>
-
-  {#if error}
-    <p class="text-red-600">Error: {error}</p>
-  {/if}
-
-  {#if events.length > 0}
-    <ul class="mt-4 space-y-2">
-      {#each events as e}
-        <li class="p-2 bg-white rounded shadow">{e.message}</li>
-      {/each}
-    </ul>
-  {:else}
-    <p class="mt-4">No events yet</p>
-  {/if}
-</div> -->
