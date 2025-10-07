@@ -17,7 +17,7 @@
 			on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onClose(); } }}
 		></div>
 		<!-- Modal content -->
-		<div class={`relative bg-white rounded-2xl shadow-2xl z-10 border border-gray-200 flex flex-col items-center ${modalClass}`}>
+		<div class={`relative bg-white rounded-2xl shadow-2xl z-10 border border-gray-200 flex flex-col items-center overflow-auto max-h-[95vh] ${modalClass}`}>
 			<button
 				class="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 text-gray-500"
 				on:click={onClose}
