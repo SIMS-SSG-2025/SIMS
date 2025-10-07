@@ -18,7 +18,7 @@ class DatabaseManager:
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
         cursor.execute("""INSERT INTO events (object_id,zone_id,location_id,has_helmet,has_vest,time)
-        VALUES (?,?,?,?,?,?,?)""",
+        VALUES (?,?,?,?,?,?)""",
         (object_id,zone_id,location_id,has_helmet,has_vest,time))
         sqlconn.commit()
         sqlconn.close()

@@ -4,13 +4,14 @@ import datetime
 
 
 class EventManager:
-    def __init__(self, logger, db_queue):
+    def __init__(self, logger, db_queue, class_names):
         self.active_tracks = []
         self.zones = []  # Predefined zones can be added here
         #db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
         self.db_queue = db_queue
         #self.database = DatabaseManager(db_path=db_path)
         self.logger = logger
+        self.class_names = class_names
 
     def handle_detections(self, tracked_objects, ppe_detections):
         """
@@ -31,12 +32,11 @@ class EventManager:
                 if obj["class"] == "Person":
                     obj["ppe"] = []
                     for ppe in ppe_detections:
-                        if self._is_overlapping(obj["bbox"], ppe["bbox"]):
-                            obj["ppe"].append(ppe["class"])
+                        if self._is_overlapping(obj["bbox"], ppe[0]):
+                            obj["ppe"].append(self.class_names[ppe[2]])
 
                 self._create_object(obj)
-
-
+                self._create_event(obj)
 
         self.active_tracks = [obj["track_id"] for obj in tracked_objects]
 
@@ -89,8 +89,8 @@ class EventManager:
             "object_id": obj["track_id"],
             "zone_id": None,
             "location": "lager1",
-            "helmet": True if "helmet" in obj.get("ppe", []) else False,
-            "vest": True if "vest" in obj.get("ppe", []) else False,
+            "helmet": True if "Hardhat" in obj.get("ppe", []) else False,
+            "vest": True if "Safety Vest" in obj.get("ppe", []) else False,
             "time": datetime.datetime.now().isoformat(),
         }
         self.logger.info(f"[DB] Event created: {event_msg}")

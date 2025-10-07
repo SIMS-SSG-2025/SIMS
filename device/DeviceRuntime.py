@@ -38,7 +38,7 @@ class DeviceRuntime:
 
         self.tracker = Tracker(class_names=self.class_names, cam_fps=cam_fps)
         self.logger = get_logger("Inference")
-        self.event_manager = EventManager(logger=self.logger, db_queue=self.db_queue)
+        self.event_manager = EventManager(logger=self.logger, db_queue=self.db_queue, class_names=self.class_names)
 
     def start(self):
         self.running = True
@@ -54,7 +54,7 @@ class DeviceRuntime:
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             detections = run_inference(rgb_frame, self.model)
             trackable_classes = ["Person", "vehicle"]
-            ppe_classes = ["helmet", "vest"]
+            ppe_classes = ["Hardhat", "NO-Hardhat", "Safety Vest", "NO-Safety Vest"]
             detections_for_tracking = [d for d in detections if self.class_names[d[-1]] in trackable_classes]
             results = DetectionResults(detections_for_tracking)
             ppe_detections = [d for d in detections if self.class_names[d[-1]] in ppe_classes]
