@@ -7,9 +7,6 @@ class DatabaseManager:
     def __init__(self,db_path):
         self.db_path = db_path
         self.logger = get_logger("DatabaseManager")
-        self.logger.info(f"Initializing DatabaseManager with path: {db_path}")
-        self._test_connection()
-
         self._test_connection()
 
     def _test_connection(self):
@@ -20,7 +17,6 @@ class DatabaseManager:
             cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
             table_count = cursor.fetchone()[0]
             sqlconn.close()
-            self.logger.info(f"Database connection successful. Found {table_count} tables")
         except Exception as e:
             self.logger.error(f"Database connection failed: {e}")
             raise
@@ -32,7 +28,7 @@ class DatabaseManager:
             cursor.execute("""INSERT INTO object (object_id,type) VALUES (?,?)""", (object_id,object_type))
             sqlconn.commit()
             sqlconn.close()
-            self.logger.debug(f"Object inserted successfully: ID={object_id}, Type={object_type}")
+            self.logger.info(f"Object inserted: ID={object_id}, Type={object_type}")
         except Exception as e:
             self.logger.error(f"Failed to insert object: {e}")
             raise
@@ -61,7 +57,6 @@ class DatabaseManager:
             cursor.execute("SELECT * from events")
             rows = cursor.fetchall()
             sqlconn.close()
-            self.logger.debug(f"Retrieved {len(rows)} events from database")
             return rows
         except Exception as e:
             self.logger.error(f"Failed to retrieve events: {e}")
@@ -104,10 +99,6 @@ class DatabaseManager:
             cursor.execute("SELECT location_id FROM location WHERE name = ?", (name,))
             result = cursor.fetchone()
             sqlconn.close()
-            if result:
-                self.logger.debug(f"Found location: {name} with ID {result[0]}")
-            else:
-                self.logger.debug(f"Location not found: {name}")
             return result[0] if result else None
         except Exception as e:
             self.logger.error(f"Failed to get location by name: {e}")
@@ -126,8 +117,7 @@ class DatabaseManager:
                 zone_id,location_id,coords_json,name = row
                 coords = json.loads(coords_json)
                 zones.append({"zone_id":zone_id,"location_id":location_id,"coords":coords,"name":name})
-            
-            self.logger.debug(f"Retrieved {len(zones)} zones from database")
+
             return zones
         except Exception as e:
             self.logger.error(f"Failed to fetch zones: {e}")
@@ -154,7 +144,6 @@ class DatabaseManager:
             sqlconn.close()
             if result:
                 status = result[0] == 1
-                self.logger.debug(f"AI running status retrieved: {status}")
                 return status
             self.logger.warning("No system config found, defaulting to False")
             return False
