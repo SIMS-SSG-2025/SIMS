@@ -15,28 +15,22 @@ from device.DeviceRuntime import DeviceRuntime
 if __name__ == "__main__":
     # Initialize logger for main module
     logger = get_logger("Main")
-    logger.info("Starting SIMS Device Application")
-    
+
     # -- Setup DB Thread --
-    logger.info("Setting up database thread and queues")
     db_queue = queue.Queue(maxsize=100)
     response_queue = queue.Queue()
     stop_event = threading.Event()
 
-    logger.info("Starting database worker thread")
     db_thread = threading.Thread(target=db_worker, args=(db_queue, stop_event))
     db_thread.start()
 
-    logger.info("Initializing device runtime")
     device_runtime = DeviceRuntime(db_queue)
-    logger.info("Entering main monitoring loop")
     while True:
         try:
             # Check system status
             db_queue.put({"action": "get_status", "response": response_queue})
             try:
                 run_flag = response_queue.get(timeout=0.2)
-                logger.debug(f"System status check: run_flag={run_flag}")
             except queue.Empty:
                 logger.warning("No response from database worker for status check")
                 run_flag = False
@@ -44,14 +38,11 @@ if __name__ == "__main__":
                 continue
 
             if run_flag:
-                logger.info("System enabled - starting device runtime")
                 device_runtime.start()
             else:
-                logger.debug("System disabled - waiting for activation")
                 time.sleep(0.5)
 
         except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received - shutting down system")
             stop_event.set()
             device_runtime.stop()
             break
@@ -59,11 +50,9 @@ if __name__ == "__main__":
             logger.error(f"Unexpected error in main loop: {e}")
             time.sleep(1)
 
-    logger.info("Cleaning up and shutting down")
     device_runtime.stop()
     stop_event.set()
     db_thread.join()
-    logger.info("SIMS Device Application shutdown complete")
 
 
 
