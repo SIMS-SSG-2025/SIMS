@@ -31,7 +31,7 @@ class DeviceRuntime:
     def _initialize_components(self):
         self._load_model()
 
-        self.class_names = load_class_mapping("device/training/dataset/safety_dataset_filtered.yaml")
+        self.class_names = load_class_mapping("device/training/dataset/safety_dataset_filtered_v2.yaml")
 
         self.cam = cv2.VideoCapture(0)
         cam_fps = self.cam.get(cv2.CAP_PROP_FPS)
@@ -50,11 +50,13 @@ class DeviceRuntime:
             # check for stop signal
             ret, frame = self.cam.read()
             if not ret:
-                continue
+                print("Cant open camera stream")
+                return
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             detections = run_inference(rgb_frame, self.model)
             trackable_classes = ["Person", "vehicle"]
-            ppe_classes = ["Hardhat", "NO-Hardhat", "Safety Vest", "NO-Safety Vest"]
+            # ppe_classes = ["Hardhat", "NO-Hardhat", "Safety Vest", "NO-Safety Vest"]
+            ppe_classes = ["Hardhat", "Safety Vest"]
             detections_for_tracking = [d for d in detections if self.class_names[d[-1]] in trackable_classes]
             results = DetectionResults(detections_for_tracking)
             ppe_detections = [d for d in detections if self.class_names[d[-1]] in ppe_classes]
@@ -98,14 +100,18 @@ class DeviceRuntime:
 
     def _load_model(self):
         model_config = "device/training/models/yolo11_ppe_cfg.yaml"
-        model_path = "device/training/models/yolo_ppe.pth"
+        model_path = "device/training/models/yolo11_ppe_v4.pt"
         with open(model_config, 'r') as file:
             model_config = yaml.safe_load(file)
 
-
+        yolo_model = torch.load(model_path, map_location='cpu')
+        model_config = yolo_model['model'].yaml
         num_classes = model_config["nc"]
         self.model = DetectionModel(cfg=model_config, nc=num_classes)
-        self.model.load_state_dict(torch.load(model_path, map_location=lambda storage, loc: storage))
+        self.model.load_state_dict(yolo_model['model'].state_dict())
+
+        # self.model = DetectionModel(cfg=model_config, nc=num_classes)
+        # self.model.load_state_dict(torch.load(model_path, map_location=lambda storage, loc: storage))
         self.model.eval()
 
     def _visualize(self, tracked_objects, frame, fps):

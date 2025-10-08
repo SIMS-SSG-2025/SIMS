@@ -8,7 +8,7 @@ def post_process(output, letterbox_info):
     ratio, dw, dh = letterbox_info
     nms_results = non_max_suppression(
             output[0],
-            conf_thres=0.7,
+            conf_thres=0.4,
             iou_thres=0.8,
             max_det=100
         )
