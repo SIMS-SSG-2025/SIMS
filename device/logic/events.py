@@ -96,3 +96,10 @@ class EventManager:
         self.logger.info(f"[DB] Event created: {event_msg}")
         self.db_queue.put(event_msg)
         print(f"Event created: {event_msg}")
+
+    def set_zones(self, zones):
+        self.zones = zones
+
+
+    def get_zones(self):
+        return self.zones

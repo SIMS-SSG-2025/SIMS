@@ -160,21 +160,7 @@ def get_logs():
         return {"logs": [], "error": str(e)}
 
 
-"""
-@app.get("/zones/stream")
-def stream_zones():
-    def event_stream():
-        last_id = set()
-        while True:
-            zones = DatabaseManager.fetch_zones()
-            current_id = set([z['zone_id'] for z in zones])
 
-            if current_id != last_id:
-                last_id = current_id
-                yield f" data: {json.dumps(zones)}\n\n"
-            time.sleep(1)
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
-"""
 
 @app.get("/zones/fetch_all")
 def get_zones():
