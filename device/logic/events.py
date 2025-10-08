@@ -117,3 +117,10 @@ class EventManager:
 
     def get_zones(self):
         return self.zones
+
+    def get_zones_coords(self):
+        zone_coords = []
+        for zone in self.zones:
+            coords = zone["coords"]
+            zone_coords.append(coords)
+        return zone_coords

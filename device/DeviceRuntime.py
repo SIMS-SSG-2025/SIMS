@@ -5,7 +5,7 @@ from device.inference.inference import run_inference
 from device.inference.tracker import Tracker, DetectionResults
 from device.logic.events import EventManager
 import queue
-
+import numpy as np
 import yaml
 from ultralytics.nn.tasks import DetectionModel
 import torch
@@ -58,6 +58,7 @@ class DeviceRuntime:
                 ret, frame = self.cam.read()
                 if not ret:
                     self.logger.warning("Failed to capture frame from camera")
+                    time.sleep(1)
                     continue
 
                 # Process frame
@@ -135,6 +136,7 @@ class DeviceRuntime:
 
     def _visualize(self, tracked_objects, frame, fps):
         ## -- Visualization --
+        frame_height, frame_width = frame.shape[:2]
         if tracked_objects:
             for obj in tracked_objects:
                     bbox = obj["bbox"]
@@ -145,6 +147,16 @@ class DeviceRuntime:
                     cv2.putText(frame, f"Track ID: {track_id} {cls_name}", (x1, y1-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
+        zones = self.event_manager.get_zones_coords()
+        for zone in zones:
+            pts = []
+            for point in zone:
+                x = int(point['x'] * frame_width)
+                y = int(point['y'] * frame_height)
+                pts.append([x, y])
+
+            pts = np.array(pts, np.int32).reshape((-1, 1, 2))
+            cv2.polylines(frame, [pts], isClosed=True, color=(255, 0, 0), thickness=2)
 
         cv2.putText(frame, f"FPS: {fps:.0f}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
