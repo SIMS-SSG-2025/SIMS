@@ -32,13 +32,32 @@ class DatabaseManager:
         sqlconn.close()
         return rows
 
-    def insert_zone(self, points,name,location_id):
+    def insert_zone(self, points, name, location_id):
         coords_json = json.dumps(points)
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
-        cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json,name))
+        cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json, name, location_id))
         sqlconn.commit()
         sqlconn.close()
+
+    def insert_location(self, name):
+        """Insert a new location and return its ID"""
+        sqlconn = sqlite3.connect(self.db_path)
+        cursor = sqlconn.cursor()
+        cursor.execute("""INSERT INTO location (name) VALUES (?)""", (name,))
+        location_id = cursor.lastrowid
+        sqlconn.commit()
+        sqlconn.close()
+        return location_id
+
+    def get_location_by_name(self, name):
+        """Get location by name, return location_id if exists"""
+        sqlconn = sqlite3.connect(self.db_path)
+        cursor = sqlconn.cursor()
+        cursor.execute("SELECT location_id FROM location WHERE name = ?", (name,))
+        result = cursor.fetchone()
+        sqlconn.close()
+        return result[0] if result else None
 
     def fetch_all_zones(self):
         sqlconn = sqlite3.connect(self.db_path)

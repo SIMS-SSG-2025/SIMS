@@ -1,11 +1,23 @@
 import os
 from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import List
 import sqlite3
 from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import cv2
 from ..db.database_manager import DatabaseManager
 from pathlib import Path
+
+# Pydantic models for request validation
+class ZoneData(BaseModel):
+    points: List[dict]
+    name: str
+
+class ConfigData(BaseModel):
+    locationName: str
+    zones: List[ZoneData]
+
 app = FastAPI()
 snapshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),"device", "snapshot")
 db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db","events.db")
@@ -54,10 +66,47 @@ def take_snapshot():
 def receive_zones(zone_data: dict):
     points = zone_data.get("points")
     name = zone_data.get("name", "Unnamed Zone")
+    location_id = zone_data.get("location_id", 1)  # Default to location_id 1 for backward compatibility
     if not points:
         return {"status": "error", "message": "No points provided"}
-    db_manager.insert_zone(points, name)
+    db_manager.insert_zone(points, name, location_id)
     return {"status": "success", "message": "Zone data received"}
+
+@app.post("/setup_config")
+def setup_config(config_data: ConfigData):
+    """
+    Setup configuration with location and zones.
+    First creates/gets the location, then creates zones with the location_id.
+    """
+    try:
+        # Check if location already exists
+        location_id = db_manager.get_location_by_name(config_data.locationName)
+
+        if location_id is None:
+            # Create new location
+            location_id = db_manager.insert_location(config_data.locationName)
+            print(f"Created new location: {config_data.locationName} with ID: {location_id}")
+        else:
+            print(f"Using existing location: {config_data.locationName} with ID: {location_id}")
+
+        # Insert zones for this location
+        zone_count = 0
+        for zone in config_data.zones:
+            db_manager.insert_zone(zone.points, zone.name, location_id)
+            zone_count += 1
+
+        return {
+            "status": "success",
+            "message": f"Configuration setup complete. Location: {config_data.locationName}, Zones: {zone_count}",
+            "location_id": location_id,
+            "zones_created": zone_count
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to setup configuration: {str(e)}"
+        }
 
 
 
@@ -90,17 +139,17 @@ def stream_zones():
 
 @app.get("/zones/fetch_all")
 def get_zones():
-    zones = DatabaseManager.fetch_all_zones()
+    zones = db_manager.fetch_all_zones()
     return zones
 
 @app.get("/system/start")
 def start_system():
-    db_manager.set_system_config(True)
+    db_manager.set_ai_running(True)
     return {"status": "Ai starting"}
 
 @app.get("/system/stop")
 def stop_system():
-    db_manager.set_system_config(False)
+    db_manager.set_ai_running(False)
     return {"status": "Ai stopping"}
 
 @app.get("/system/status")
