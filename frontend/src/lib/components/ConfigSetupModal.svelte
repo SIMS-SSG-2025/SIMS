@@ -100,10 +100,6 @@
         }
     }
 
-    async function startMonitoring() {
-
-    }
-
     const steps = [
         { id: 1, title: "Setup", description: "Current or new configuration" },
         { id: 2, title: "Zones", description: "Define monitoring zones" },
@@ -151,18 +147,48 @@
         onClose();
     }
 
-    function handleStart() {
-        // Save configuration to localStorage including snapshot path
-        const config = {
-            locationName,
-            zones,
-            snapshotPath: customSnapshotPath || undefined
-        };
-        localStorage.setItem('sims-config', JSON.stringify(config));
+    async function handleStart() {
+        try {
+            // Save configuration to localStorage including snapshot path
+            const config = {
+                locationName,
+                zones,
+                snapshotPath: customSnapshotPath || undefined
+            };
+            localStorage.setItem('sims-config', JSON.stringify(config));
 
-        console.log("Starting configuration:", config);
-        // For now, just close the modal
-        handleClose();
+            // Send configuration to server
+            const response = await fetch("http://127.0.0.1:8000/setup_config", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    locationName,
+                    zones
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.status === "success") {
+                console.log("Configuration sent successfully:", result);
+
+                // Start the monitoring system
+                const startResponse = await fetch("http://127.0.0.1:8000/system/start");
+                const startResult = await startResponse.json();
+                console.log("System start response:", startResult);
+
+                handleClose();
+            } else {
+                console.error("Failed to send configuration:", result.message);
+                // You might want to show an error message to the user here
+                alert(`Failed to setup configuration: ${result.message}`);
+            }
+        } catch (error: any) {
+            console.error("Error setting up configuration:", error);
+            alert(`Error: ${error.message}`);
+        }
     }
 
     $: canProceedStep1 = locationName.trim().length > 0 || storedConfig !== null;
