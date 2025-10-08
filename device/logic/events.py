@@ -69,30 +69,45 @@ class EventManager:
 
     def _create_object(self, obj):
         """ Create an object in the database. """
+        try:
+            object_msg = {
+                "action": "insert_object",
+                "object_id": obj["track_id"],
+                "type": obj["class"],
+            }
 
-        object_msg = {
-            "action": "insert_object",
-            "object_id": obj["track_id"],
-            "type": obj["class"],
-        }
+            self.logger.info(f"Creating object: ID={obj['track_id']}, Type={obj['class']}")
+            self.db_queue.put(object_msg)
 
-        self.logger.info(f"[DB] Object created: {object_msg}")
-        self.db_queue.put(object_msg)
-        print(f"Object created: {object_msg}")
-
+        except Exception as e:
+            self.logger.error(f"Failed to create object: {e}")
 
     def _create_event(self, obj):
         """ Create an event in the database. """
+        try:
+            has_helmet = "Hardhat" in obj.get("ppe", [])
+            has_vest = "Safety Vest" in obj.get("ppe", [])
 
-        event_msg = {
-            "action": "insert_event",
-            "object_id": obj["track_id"],
-            "zone_id": None,
-            "location": "lager1",
-            "helmet": True if "Hardhat" in obj.get("ppe", []) else False,
-            "vest": True if "Safety Vest" in obj.get("ppe", []) else False,
-            "time": datetime.datetime.now().isoformat(),
-        }
-        self.logger.info(f"[DB] Event created: {event_msg}")
-        self.db_queue.put(event_msg)
-        print(f"Event created: {event_msg}")
+            event_msg = {
+                "action": "insert_event",
+                "object_id": obj["track_id"],
+                "zone_id": None,
+                "location": "lager1",
+                "helmet": has_helmet,
+                "vest": has_vest,
+                "time": datetime.datetime.now().isoformat(),
+            }
+
+            safety_status = []
+            if has_helmet:
+                safety_status.append("helmet")
+            if has_vest:
+                safety_status.append("vest")
+
+            safety_str = f"with {', '.join(safety_status)}" if safety_status else "without PPE"
+            self.logger.info(f"Creating event: Object {obj['track_id']} detected {safety_str}")
+
+            self.db_queue.put(event_msg)
+
+        except Exception as e:
+            self.logger.error(f"Failed to create event: {e}")
