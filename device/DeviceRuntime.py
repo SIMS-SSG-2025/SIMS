@@ -1,7 +1,6 @@
 import cv2
 from ultralytics import YOLO
 import time
-
 from device.inference.inference import run_inference
 from device.inference.tracker import Tracker, DetectionResults
 from device.logic.events import EventManager
@@ -120,7 +119,7 @@ class DeviceRuntime:
                     cv2.putText(frame, f"Track ID: {track_id} {cls_name}", (x1, y1-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
-
+        
         cv2.putText(frame, f"FPS: {fps:.0f}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.imshow("Camera feed", frame)
@@ -128,7 +127,18 @@ class DeviceRuntime:
 
 
     def _update_config(self):
-        # Update the configuration if needed
-        # get zones from db
-        # pass them into eventhandler
-        pass
+        self.db_queue.put({"action": "get_zones", "response": self.response_queue})
+        try:
+            zones = self.response_queue.get(timeout=0.1)
+            print(f"fetched {len(zones)} zones from database.")
+            self.event_manager.set_zones(zones)
+
+        except queue.Empty:
+            print("No zones fetched.")
+
+
+    """
+    # Update the configuration if needed
+    # get zones from db
+    # pass them into eventhandler
+    """
