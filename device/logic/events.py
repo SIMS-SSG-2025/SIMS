@@ -111,3 +111,9 @@ class EventManager:
 
         except Exception as e:
             self.logger.error(f"Failed to create event: {e}")
+
+    def set_zones(self, zones):
+        self.zones = zones
+
+    def get_zones(self):
+        return self.zones

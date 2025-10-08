@@ -101,7 +101,7 @@ class DeviceRuntime:
         self.running = False
         if self.cam:
             self.cam.release()
-
+        self.db_queue.put({"action": "set_status", "status": False})
         cv2.destroyAllWindows()
 
 
@@ -145,7 +145,7 @@ class DeviceRuntime:
                     cv2.putText(frame, f"Track ID: {track_id} {cls_name}", (x1, y1-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
-        
+
         cv2.putText(frame, f"FPS: {fps:.0f}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.imshow("Camera feed", frame)
