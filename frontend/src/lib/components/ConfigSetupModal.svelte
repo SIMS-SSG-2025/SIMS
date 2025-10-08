@@ -71,7 +71,7 @@
         snapshotError = null;
 
         try {
-            const response = await fetch("http://127.0.0.1:8000/snapshot");
+            const response = await fetch("http://10.10.67.44:8000/snapshot");
             if (!response.ok) {
                 throw new Error(`Error fetching snapshot: ${response.statusText}`);
             }
@@ -158,7 +158,7 @@
             localStorage.setItem('sims-config', JSON.stringify(config));
 
             // Send configuration to server
-            const response = await fetch("http://127.0.0.1:8000/setup_config", {
+            const response = await fetch("http://10.10.67.44:8000/setup_config", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -175,7 +175,7 @@
                 console.log("Configuration sent successfully:", result);
 
                 // Start the monitoring system
-                const startResponse = await fetch("http://127.0.0.1:8000/system/start");
+                const startResponse = await fetch("http://10.10.67.44:8000/system/start");
                 const startResult = await startResponse.json();
                 console.log("System start response:", startResult);
 
