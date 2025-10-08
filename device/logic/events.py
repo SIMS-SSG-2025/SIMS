@@ -1,7 +1,7 @@
 import os
 from backend.db.database_manager import DatabaseManager
 import datetime
-
+from shapely.geometry import Point, Polygon
 
 class EventManager:
     def __init__(self, logger, db_queue, class_names):
@@ -49,6 +49,7 @@ class EventManager:
         Check if two bounding boxes overlap.
         bbox: [x, y, w, h]
         """
+
         x1, y1, w1, h1 = bbox1
         x2, y2, w2, h2 = bbox2
 
@@ -58,13 +59,14 @@ class EventManager:
         return False
 
     def _check_zone(self, bbox):
-        """
-        Check if the bbox is in a predefined zone.
-        For simplicity, let's say zone is defined as x > 100 and y > 100
-        """
         x, y, w, h = bbox
-        if x > 100 and y > 100:
-            return True
+        x_center = (x + w) / 2
+        y_feet = y + h
+        point = Point(x_center, y_feet)
+        for zone in self.zones:
+            polygon = Polygon(zone["coords"])
+            if polygon.contains(point):
+                return True
         return False
 
     def _create_object(self, obj):
@@ -103,3 +105,4 @@ class EventManager:
 
     def get_zones(self):
         return self.zones
+
