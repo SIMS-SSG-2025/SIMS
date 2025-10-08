@@ -17,9 +17,9 @@ class EventManager:
         """
         Handles detections.
         Creates or updates events in DB as needed.
-        Check for new object
-        tracked_objects: {track_id: 1, bbox: [x, y, w, h], cls: "person"}
-        ppe_detections: [{"bbox": [x, y, w, h], "class_id": "helmet", "score": 0.9}]
+        Check for new objects
+        tracked_objects: [{track_id: 1, bbox: [x1, y1, x2, y2], cls: "Person", conf: 0.9}]
+        ppe_detections: [(([x1, y1, x2, y2]), conf, class_id)]
         """
         if tracked_objects is None:
             return
@@ -44,18 +44,27 @@ class EventManager:
 
 
 
-    def _is_overlapping(self, bbox1, bbox2):
+    def _is_overlapping(self, bbox1, bbox2, iou_threshold=0.8):
         """
-        Check if two bounding boxes overlap.
-        bbox: [x, y, w, h]
+        Computes iou and returns true if bbox1 and bbox2 exceeds iou_threshold.
+        bbox: [x1, y1, x2, y2]
         """
-        x1, y1, w1, h1 = bbox1
-        x2, y2, w2, h2 = bbox2
+        inter_x1 = max(bbox1[0], bbox2[0])
+        inter_y1 = max(bbox1[1], bbox2[1])
+        inter_x2 = min(bbox1[2], bbox2[2])
+        inter_y2 = min(bbox1[3], bbox2[3])
 
-        if (x1 < x2 + w2 and x1 + w1 > x2 and
-            y1 < y2 + h2 and y1 + h1 > y2):
-            return True
-        return False
+        area1 = max(0, bbox1[2] - bbox1[0]) * max(0, bbox1[3] - bbox1[1])
+        area2 = max(0, bbox2[2] - bbox2[0]) * max(0, bbox2[3] - bbox2[1])
+
+        inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+
+        union_area = area1 + area2 - inter_area
+
+        if union_area == 0:
+            return False
+
+        return (inter_area / union_area) >= iou_threshold
 
     def _check_zone(self, bbox):
         """
@@ -96,3 +105,5 @@ class EventManager:
         self.logger.info(f"[DB] Event created: {event_msg}")
         self.db_queue.put(event_msg)
         print(f"Event created: {event_msg}")
+
+
