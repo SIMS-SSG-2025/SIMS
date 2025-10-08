@@ -114,7 +114,6 @@ class DeviceRuntime:
                 self.running = False
 
         except queue.Empty:
-            self.logger.warning("No response received for status check")
             pass
 
     def _load_model(self):
