@@ -100,6 +100,10 @@
         }
     }
 
+    async function startMonitoring() {
+
+    }
+
     const steps = [
         { id: 1, title: "Setup", description: "Current or new configuration" },
         { id: 2, title: "Zones", description: "Define monitoring zones" },
@@ -251,24 +255,28 @@
                                                 </div>
                                             {/each}
                                         </div>
+                                    {:else}
+                                        <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                                            <p class="text-sm text-gray-600">No zones defined - monitoring covers the entire area</p>
+                                        </div>
+                                    {/if}
 
-                                        <!-- Zone Preview -->
-                                        {#if storedConfig.snapshotPath}
-                                            <div class="border border-gray-200 rounded-lg overflow-hidden">
-                                                <ZoneDrawer
-                                                    onFinishZone={() => {}}
-                                                    width={1200}
-                                                    height={675}
-                                                    zones={storedConfig.zones}
-                                                    readOnly={true}
-                                                    imageSrc={storedConfig.snapshotPath}
-                                                />
-                                            </div>
-                                        {:else}
-                                            <div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
-                                                <p class="text-sm text-gray-600 text-center">No snapshot saved with this configuration</p>
-                                            </div>
-                                        {/if}
+                                    <!-- Zone Preview - Always show snapshot if available -->
+                                    {#if storedConfig.snapshotPath}
+                                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                                            <ZoneDrawer
+                                                onFinishZone={() => {}}
+                                                width={1200}
+                                                height={675}
+                                                zones={storedConfig.zones}
+                                                readOnly={true}
+                                                imageSrc={storedConfig.snapshotPath}
+                                            />
+                                        </div>
+                                    {:else}
+                                        <div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
+                                            <p class="text-sm text-gray-600 text-center">No snapshot saved with this configuration</p>
+                                        </div>
                                     {/if}
                                 </div>
 
