@@ -1,6 +1,7 @@
 import os
 from backend.db.database_manager import DatabaseManager
 import datetime
+from ..utils.logger import get_logger
 
 
 class EventManager:
@@ -11,6 +12,7 @@ class EventManager:
         self.db_queue = db_queue
         #self.database = DatabaseManager(db_path=db_path)
         self.logger = logger
+        self.detection_logger = get_logger("DETECTION")
         self.class_names = class_names
 
     def handle_detections(self, tracked_objects, ppe_detections):
@@ -115,6 +117,7 @@ class EventManager:
 
             safety_str = f"with {', '.join(safety_status)}" if safety_status else "without PPE"
             self.logger.info(f"Creating event: Object {obj['track_id']} detected {safety_str}")
+            self.detection_logger.info(f"Detected {obj['class']} with ID {obj['track_id']} {safety_str}")
 
             self.db_queue.put(event_msg)
 
