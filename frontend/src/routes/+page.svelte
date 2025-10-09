@@ -5,6 +5,7 @@
     import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
     import Modal from "$lib/components/modal.svelte";
     import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
+    import LogModal from "$lib/components/LogModal.svelte";
     import { onMount } from "svelte";
 
     let now = new Date();
@@ -32,6 +33,7 @@
     let showZoneModal = false;
     let showSettingsModal = false;
     let showConfigModal = false;
+    let showLogModal = false;
 
     function openZoneModal() {
         showZoneModal = true;
@@ -50,6 +52,12 @@
     }
     function closeConfigModal() {
         showConfigModal = false;
+    }
+    function openLogModal() {
+        showLogModal = true;
+    }
+    function closeLogModal() {
+        showLogModal = false;
     }
 
     const ranges: { label: string; value: "day" | "week" | "month" | "all" }[] = [
@@ -90,8 +98,6 @@
 
     let events: Event[] = [];
 
-    let logs: string[] = [];
-
     async function loadEvents() {
         loading = true;
         error = null;
@@ -122,31 +128,6 @@
         const data = await response.json();
         console.log(data);
     }
-
-    async function fetchLogs() {
-        try {
-            // IP jetson: 10.10.67.44
-            const response = await fetch("http://10.10.67.44:8000/logs");
-            if (!response.ok) {
-                throw new Error(`Error fetching logs: ${response.statusText}`);
-            }
-            const data = await response.json();
-            console.log(data);
-            logs = data.logs || [];
-        } catch (err: any) {
-            error = err.message;
-        } finally {
-            loading = false;
-        }
-    }
-    let logInterval: any;
-    onMount(() => {
-        logInterval = setInterval(fetchLogs, 5000);
-        fetchLogs(); // Initial fetch
-        return () => {
-            clearInterval(logInterval);
-        };
-    });
 
 </script>
 
@@ -194,8 +175,21 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2" />
             </svg>
         </button>
-    <Modal open={showSettingsModal} onClose={closeSettingsModal} modalClass="p-0 w-full max-w-md max-h-[90vh]">
-        <span class="text-lg font-semibold text-gray-700 mb-2 mt-6">Settings</span>
+    <Modal open={showSettingsModal} onClose={closeSettingsModal} modalClass="p-6 w-full max-w-md max-h-[90vh]">
+        <div class="w-full">
+            <h2 class="text-xl font-semibold text-gray-800 mb-6">Settings</h2>
+            <div class="space-y-4">
+                <button
+                    class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm flex items-center justify-center gap-2"
+                    on:click={openLogModal}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    View Logs
+                </button>
+            </div>
+        </div>
     </Modal>
     </div>
 </header>
@@ -243,18 +237,9 @@
             <span class="text-2xl font-bold text-gray-800">Card B</span>
             <span class="text-gray-400 mt-2">Info or stat</span>
         </div>
-        <div class="bg-white rounded-2xl shadow p-6 flex flex-col min-h-[120px]">
-            <div class="flex-1 w-full max-h-32 overflow-y-auto text-sm text-gray-700 bg-gray-50 rounded p-2 border border-gray-200">
-                {#if logs.length > 0}
-                    <ul class="space-y-1">
-                        {#each logs as log}
-                            <li class="whitespace-pre-line">{log}</li>
-                        {/each}
-                    </ul>
-                {:else}
-                    <div>No log messages yet.</div>
-                {/if}
-            </div>
+        <div class="bg-white rounded-2xl shadow p-6 flex flex-col items-center justify-center min-h-[120px]">
+            <span class="text-2xl font-bold text-gray-800">Card C</span>
+            <span class="text-gray-400 mt-2">Info or stat</span>
         </div>
     </div>
 
@@ -273,6 +258,11 @@
     <ConfigSetupModal
         open={showConfigModal}
         onClose={closeConfigModal}
+    />
+
+    <LogModal
+        open={showLogModal}
+        onClose={closeLogModal}
     />
 </main>
 
