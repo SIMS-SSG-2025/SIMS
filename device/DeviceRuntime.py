@@ -135,8 +135,13 @@ class DeviceRuntime:
 
         except queue.Empty:
             print("No zones fetched.")
+        self.db_queue.put({"action": "get_latest_object_id", "response": self.response_queue})
+        try:
+            last_object_id = self.response_queue.get(timeout=0.1)
 
 
+        except queue.Empty:
+            print("No objects fetched.")
     """
     # Update the configuration if needed
     # get zones from db
