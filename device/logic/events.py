@@ -1,7 +1,10 @@
 import os
 from backend.db.database_manager import DatabaseManager
 import datetime
+
 from shapely.geometry import Point, Polygon
+
+from ..utils.logger import get_logger
 
 class EventManager:
     def __init__(self, logger, db_queue, class_names):
@@ -11,15 +14,16 @@ class EventManager:
         self.db_queue = db_queue
         #self.database = DatabaseManager(db_path=db_path)
         self.logger = logger
+        self.detection_logger = get_logger("DETECTION")
         self.class_names = class_names
 
     def handle_detections(self, tracked_objects, ppe_detections):
         """
         Handles detections.
         Creates or updates events in DB as needed.
-        Check for new object
-        tracked_objects: {track_id: 1, bbox: [x, y, w, h], cls: "person"}
-        ppe_detections: [{"bbox": [x, y, w, h], "class_id": "helmet", "score": 0.9}]
+        Check for new objects
+        tracked_objects: [{track_id: 1, bbox: [x1, y1, x2, y2], cls: "Person", conf: 0.9}]
+        ppe_detections: [(([x1, y1, x2, y2]), conf, class_id)]
         """
         if tracked_objects is None:
             return
@@ -44,19 +48,28 @@ class EventManager:
 
 
 
-    def _is_overlapping(self, bbox1, bbox2):
+    def _is_overlapping(self, bbox1, bbox2, iou_threshold=0.8):
         """
-        Check if two bounding boxes overlap.
-        bbox: [x, y, w, h]
+        Computes iou and returns true if bbox1 and bbox2 exceeds iou_threshold.
+        bbox: [x1, y1, x2, y2]
         """
 
-        x1, y1, w1, h1 = bbox1
-        x2, y2, w2, h2 = bbox2
+        inter_x1 = max(bbox1[0], bbox2[0])
+        inter_y1 = max(bbox1[1], bbox2[1])
+        inter_x2 = min(bbox1[2], bbox2[2])
+        inter_y2 = min(bbox1[3], bbox2[3])
 
-        if (x1 < x2 + w2 and x1 + w1 > x2 and
-            y1 < y2 + h2 and y1 + h1 > y2):
-            return True
-        return False
+        area1 = max(0, bbox1[2] - bbox1[0]) * max(0, bbox1[3] - bbox1[1])
+        area2 = max(0, bbox2[2] - bbox2[0]) * max(0, bbox2[3] - bbox2[1])
+
+        inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+
+        union_area = area1 + area2 - inter_area
+
+        if union_area == 0:
+            return False
+
+        return (inter_area / union_area) >= iou_threshold
 
     def _check_zone(self, bbox):
         x, y, w, h = bbox
@@ -71,38 +84,61 @@ class EventManager:
 
     def _create_object(self, obj):
         """ Create an object in the database. """
+        try:
+            object_msg = {
+                "action": "insert_object",
+                "object_id": obj["track_id"],
+                "type": obj["class"],
+            }
 
-        object_msg = {
-            "action": "insert_object",
-            "object_id": obj["track_id"],
-            "type": obj["class"],
-        }
+            self.logger.info(f"Creating object: ID={obj['track_id']}, Type={obj['class']}")
+            self.db_queue.put(object_msg)
 
-        self.logger.info(f"[DB] Object created: {object_msg}")
-        self.db_queue.put(object_msg)
-        print(f"Object created: {object_msg}")
-
+        except Exception as e:
+            self.logger.error(f"Failed to create object: {e}")
 
     def _create_event(self, obj):
         """ Create an event in the database. """
+        try:
+            has_helmet = "Hardhat" in obj.get("ppe", [])
+            has_vest = "Safety Vest" in obj.get("ppe", [])
 
-        event_msg = {
-            "action": "insert_event",
-            "object_id": obj["track_id"],
-            "zone_id": None,
-            "location": "lager1",
-            "helmet": True if "Hardhat" in obj.get("ppe", []) else False,
-            "vest": True if "Safety Vest" in obj.get("ppe", []) else False,
-            "time": datetime.datetime.now().isoformat(),
-        }
-        self.logger.info(f"[DB] Event created: {event_msg}")
-        self.db_queue.put(event_msg)
-        print(f"Event created: {event_msg}")
+            event_msg = {
+                "action": "insert_event",
+                "object_id": obj["track_id"],
+                "zone_id": None,
+                "location": "lager1",
+                "helmet": has_helmet,
+                "vest": has_vest,
+                "time": datetime.datetime.now().isoformat(),
+            }
+
+            safety_status = []
+            if has_helmet:
+                safety_status.append("helmet")
+            if has_vest:
+                safety_status.append("vest")
+
+            safety_str = f"with {', '.join(safety_status)}" if safety_status else "without PPE"
+            self.logger.info(f"Creating event: Object {obj['track_id']} detected {safety_str}")
+            self.detection_logger.info(f"Detected {obj['class']} with ID {obj['track_id']} {safety_str}")
+
+            self.db_queue.put(event_msg)
+
+        except Exception as e:
+            self.logger.error(f"Failed to create event: {e}")
 
     def set_zones(self, zones):
         self.zones = zones
 
-
     def get_zones(self):
         return self.zones
+
+
+    def get_zones_coords(self):
+        zone_coords = []
+        for zone in self.zones:
+            coords = zone["coords"]
+            zone_coords.append(coords)
+        return zone_coords
 
