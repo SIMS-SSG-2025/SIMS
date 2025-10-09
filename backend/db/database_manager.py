@@ -70,3 +70,13 @@ class DatabaseManager:
         if result:
             return result[0] == 1
         return False
+
+    def get_letest_object_id(self):
+        sqlconn = sqlite3.connect(self.db_path)
+        cursor = sqlconn.cursor()
+        cursor.execute("SELECT MAX(object_id) FROM object")
+        result = cursor.fetchone()
+        sqlconn.close()
+        if result and result[0]:
+            return result[0]
+        return 0
