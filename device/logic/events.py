@@ -1,8 +1,10 @@
 import os
 from backend.db.database_manager import DatabaseManager
 import datetime
-from ..utils.logger import get_logger
 
+from shapely.geometry import Point, Polygon
+
+from ..utils.logger import get_logger
 
 class EventManager:
     def __init__(self, logger, db_queue, class_names):
@@ -51,6 +53,7 @@ class EventManager:
         Computes iou and returns true if bbox1 and bbox2 exceeds iou_threshold.
         bbox: [x1, y1, x2, y2]
         """
+
         inter_x1 = max(bbox1[0], bbox2[0])
         inter_y1 = max(bbox1[1], bbox2[1])
         inter_x2 = min(bbox1[2], bbox2[2])
@@ -69,13 +72,14 @@ class EventManager:
         return (inter_area / union_area) >= iou_threshold
 
     def _check_zone(self, bbox):
-        """
-        Check if the bbox is in a predefined zone.
-        For simplicity, let's say zone is defined as x > 100 and y > 100
-        """
         x, y, w, h = bbox
-        if x > 100 and y > 100:
-            return True
+        x_center = (x + w) / 2
+        y_feet = y + h
+        point = Point(x_center, y_feet)
+        for zone in self.zones:
+            polygon = Polygon(zone["coords"])
+            if polygon.contains(point):
+                return True
         return False
 
     def _create_object(self, obj):
@@ -130,9 +134,11 @@ class EventManager:
     def get_zones(self):
         return self.zones
 
+
     def get_zones_coords(self):
         zone_coords = []
         for zone in self.zones:
             coords = zone["coords"]
             zone_coords.append(coords)
         return zone_coords
+
