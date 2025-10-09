@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from ultralytics.trackers.bot_sort import BOTSORT
 import numpy as np
-
+from ultralytics.trackers.basetrack import BaseTrack
 class DetectionResults:
     def __init__(self, dets):
         flat_dets = []
@@ -107,3 +107,7 @@ class Tracker:
 
 
         return tracked_objects, in_frame_tracks
+
+    def set_track_id(self,track_id):
+        BaseTrack._count = track_id
+
