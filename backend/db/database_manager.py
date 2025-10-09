@@ -71,7 +71,7 @@ class DatabaseManager:
             return result[0] == 1
         return False
 
-    def get_letest_object_id(self):
+    def get_latest_object_id(self):
         sqlconn = sqlite3.connect(self.db_path)
         cursor = sqlconn.cursor()
         cursor.execute("SELECT MAX(object_id) FROM object")
