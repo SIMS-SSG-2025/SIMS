@@ -38,7 +38,6 @@ class Tracker:
         )
 
         self.tracker = BOTSORT(args, frame_rate=int(cam_fps))
-        # BaseTrack._count = 12 # Get latest object id from db
         # self.tracker.encoder.model.device.to("cuda") to gpu
         self.class_names = class_names
 

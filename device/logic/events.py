@@ -6,13 +6,14 @@ from shapely.geometry import Point, Polygon
 
 from ..utils.logger import get_logger
 
+
 class EventManager:
     def __init__(self, logger, db_queue, class_names):
         self.active_tracks = []
-        self.zones = []  # Predefined zones can be added here
-        #db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
+        self.zones = None  # Predefined zones can be added here
+        # db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
         self.db_queue = db_queue
-        #self.database = DatabaseManager(db_path=db_path)
+        # self.database = DatabaseManager(db_path=db_path)
         self.logger = logger
         self.detection_logger = get_logger("DETECTION")
         self.class_names = class_names
@@ -42,11 +43,13 @@ class EventManager:
                 self._create_object(obj)
                 self._create_event(obj)
 
+            if self.zones:
+                for zone in self.zones:
+                    if obj["class"] == "Person" and self._check_zone(obj["bbox"], zone["coords"]):
+                        self._create_event(obj, zone["zone_id"])
+                        break
+
         self.active_tracks = [obj["track_id"] for obj in tracked_objects]
-
-
-
-
 
     def _is_overlapping(self, bbox1, bbox2, iou_threshold=0.8):
         """
@@ -71,15 +74,14 @@ class EventManager:
 
         return (inter_area / union_area) >= iou_threshold
 
-    def _check_zone(self, bbox):
-        x, y, w, h = bbox
-        x_center = (x + w) / 2
-        y_feet = y + h
+    def _check_zone(self, bbox, zone):
+        x1, y1, x2, y2 = bbox
+        x_center = (x1 + x2) / 2
+        y_feet = y2
         point = Point(x_center, y_feet)
-        for zone in self.zones:
-            polygon = Polygon(zone["coords"])
-            if polygon.contains(point):
-                return True
+        polygon = Polygon(zone)
+        if polygon.contains(point):
+            return True
         return False
 
     def _create_object(self, obj):
@@ -97,7 +99,7 @@ class EventManager:
         except Exception as e:
             self.logger.error(f"Failed to create object: {e}")
 
-    def _create_event(self, obj):
+    def _create_event(self, obj, zone_id=None):
         """ Create an event in the database. """
         try:
             has_helmet = "Hardhat" in obj.get("ppe", [])
@@ -106,7 +108,7 @@ class EventManager:
             event_msg = {
                 "action": "insert_event",
                 "object_id": obj["track_id"],
-                "zone_id": None,
+                "zone_id": zone_id,
                 "location": "lager1",
                 "helmet": has_helmet,
                 "vest": has_vest,
@@ -128,12 +130,28 @@ class EventManager:
         except Exception as e:
             self.logger.error(f"Failed to create event: {e}")
 
-    def set_zones(self, zones):
-        self.zones = zones
+    def set_zones(self, zones, frame_width, frame_height):
+        processed_zones = []
+
+        for zone in zones:
+            pixel_coords = []
+            for point in zone["coords"]:
+                x = int(point['x'] * frame_width)
+                y = int(point['y'] * frame_height)
+                pixel_coords.append([x, y])
+            processed_zone = {
+                'zone_id': zone["zone_id"],
+                'location_id': zone["location_id"],
+                'coords': pixel_coords,
+                'name': zone["name"],
+            }
+
+            processed_zones.append(processed_zone)
+
+        self.zones = processed_zones
 
     def get_zones(self):
         return self.zones
-
 
     def get_zones_coords(self):
         zone_coords = []
@@ -141,4 +159,3 @@ class EventManager:
             coords = zone["coords"]
             zone_coords.append(coords)
         return zone_coords
-

@@ -23,6 +23,8 @@ class DeviceRuntime:
         self.running = False
         self.class_names = None
         self.response_queue = queue.Queue()
+        self.frame_width = None
+        self.frame_height = None
         self._initialize_components()
 
 
@@ -38,6 +40,10 @@ class DeviceRuntime:
             raise RuntimeError("Camera initialization failed")
 
         cam_fps = self.cam.get(cv2.CAP_PROP_FPS)
+
+        ret, frame = self.cam.read()
+        if ret:
+            self.frame_height, self.frame_width = frame.shape[:2]
 
         self.tracker = Tracker(class_names=self.class_names, cam_fps=cam_fps)
         inference_logger = get_logger("Inference")
@@ -137,7 +143,6 @@ class DeviceRuntime:
 
     def _visualize(self, tracked_objects, frame, fps):
         ## -- Visualization --
-        frame_height, frame_width = frame.shape[:2]
         if tracked_objects:
             for obj in tracked_objects:
                     bbox = obj["bbox"]
@@ -150,14 +155,8 @@ class DeviceRuntime:
 
         zones = self.event_manager.get_zones_coords()
         for zone in zones:
-            pts = []
-            for point in zone:
-                x = int(point['x'] * frame_width)
-                y = int(point['y'] * frame_height)
-                pts.append([x, y])
-
-            pts = np.array(pts, np.int32).reshape((-1, 1, 2))
-            cv2.polylines(frame, [pts], isClosed=True, color=(255, 0, 0), thickness=2)
+            pts = np.array(zone, np.int32).reshape((-1, 1, 2))
+            cv2.polylines(frame, [pts], isClosed=True, color=(0, 0, 255), thickness=2)
 
         cv2.putText(frame, f"FPS: {fps:.0f}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
@@ -170,7 +169,7 @@ class DeviceRuntime:
         try:
             zones = self.response_queue.get(timeout=0.1)
             print(f"Fetched {len(zones)} zones from database.")
-            self.event_manager.set_zones(zones)
+            self.event_manager.set_zones(zones, self.frame_width, self.frame_height)
 
         except queue.Empty:
             print("No zones fetched.")
