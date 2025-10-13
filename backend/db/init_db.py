@@ -9,7 +9,7 @@ cursor = sqlconn.cursor()
 timeslot = datetime.datetime.now()
 
 cursor.execute("""CREATE TABLE IF NOT EXISTS events (event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-object_id INTEGER NOT NULL,zone_id INTEGER NOT NULL,location_id INTEGER NOT NULL,
+object_id INTEGER NOT NULL,zone_id INTEGER,location_id INTEGER NOT NULL,
 time TEXT NOT NULL,
 has_helmet INTEGER NOT NULL DEFAULT 0 CHECK(has_helmet IN (0,1)),has_vest INTEGER NOT NULL DEFAULT 0 CHECK(has_vest IN (0,1)),
 FOREIGN KEY (zone_id) REFERENCES zones (zone_id),FOREIGN KEY (location_id) REFERENCES location (location_id))""")
