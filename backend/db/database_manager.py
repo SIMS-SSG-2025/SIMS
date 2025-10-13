@@ -56,3 +56,29 @@ class DatabaseManager:
         if result and result[0]:
             return result[0]
         return 0
+
+    def get_latest_location(self):
+        self.cursor.execute("SELECT location_id, name FROM location ORDER BY location_id DESC LIMIT 1")
+        return self.cursor.fetchone()
+
+    def get_zones_by_location(self, location_id):
+        self.cursor.execute("SELECT * FROM zones WHERE location_id=?", (location_id,))
+        rows = self.cursor.fetchall()
+        zones = []
+        for row in rows:
+            zone_id, loc_id, coords_json, name = row
+            coords = json.loads(coords_json)
+            zones.append({"zone_id": zone_id, "location_id": loc_id, "coords": coords, "name": name})
+        return zones
+
+    def get_location_by_name(self, name):
+        self.cursor.execute("SELECT location_id FROM location WHERE name=?", (name,))
+        result = self.cursor.fetchone()
+        if result:
+            return result[0]
+        return None
+
+    def insert_location(self, name):
+        self.cursor.execute("INSERT INTO location (name) VALUES (?)", (name,))
+        self.sqlconn.commit()
+        return self.cursor.lastrowid

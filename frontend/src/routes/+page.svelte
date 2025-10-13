@@ -1,33 +1,37 @@
 
 <script lang="ts">
-    import TablePlaceholder from "$lib/components/TablePlaceholder.svelte";
     import LineChart from "$lib/components/LineChart.svelte";
-    import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
     import Modal from "$lib/components/modal.svelte";
     import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
     import LogModal from "$lib/components/LogModal.svelte";
     import { onMount } from "svelte";
+    import { fetchCurrentConfig, type Config } from "$lib/api/config";
 
     let now = new Date();
     let interval: any;
     let selectedRange: "day" | "week" | "month" | "all" = "day";
 
-    type Zone = {
-        points: { x: number; y: number }[];
-        name: string;
-    }
+    let config: Config | null = null;
+    let configLoading = true;
 
-    let zones: Zone[] = [];
 
     onMount(() => {
         interval = setInterval(() => {
             now = new Date();
         }, 1000);
 
+        loadConfiguration();
+
         return () => {
             clearInterval(interval);
         };
     });
+
+    async function loadConfiguration() {
+        configLoading = true;
+        config = await fetchCurrentConfig();
+        configLoading = false;
+    }
 
         // Modal state
     let showZoneModal = false;
@@ -75,23 +79,6 @@
     let loading = false;
     let error: string | null = null;
 
-    async function fetchSnapshot() {
-        loading = true;
-        error = null;
-        try {
-            const response = await fetch("http://127.0.0.1:8000/snapshot");
-            if (!response.ok) {
-                throw new Error(`Error fetching snapshot: ${response.statusText}`);
-            }
-            const blob = await response.blob();
-            snapshotURL = URL.createObjectURL(blob);
-        } catch (err: any) {
-            error = err.message;
-        } finally {
-            loading = false;
-        }
-    }
-
     type Event = {
         message: string;
     };
@@ -113,20 +100,6 @@
         } finally {
             loading = false;
         }
-    }
-
-    async function sendZone(points: { x: number; y: number }[], name: string) {
-
-        zones = [...zones, { points, name }];
-        const response = await fetch("http://127.0.0.1:8000/zones", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ points, name })
-        });
-        const data = await response.json();
-        console.log(data);
     }
 
 </script>
@@ -216,15 +189,6 @@
             <span class="text-lg font-semibold text-gray-700 mb-2">Line Chart</span>
             <div class="flex-1 flex items-center justify-center text-gray-300"><LineChart /></div>
         </div>
-        <div class="bg-white rounded-2xl shadow p-6 min-h-[320px] flex flex-col items-center justify-center">
-            <img src="/snapshot.jpg" alt="Snapshot" class="rounded-xl shadow max-w-full max-h-64 object-contain border border-gray-200 mb-4" />
-            <button
-                class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition"
-                on:click={openZoneModal}
-            >
-                Draw Zones
-            </button>
-        </div>
     </div>
 
     <!-- Log & Info Row (3 cards) -->
@@ -242,18 +206,6 @@
             <span class="text-gray-400 mt-2">Info or stat</span>
         </div>
     </div>
-
-    <Modal open={showZoneModal} onClose={closeZoneModal} modalClass="p-6 w-full max-w-5xl max-h-[90vh] overflow-auto">
-        <div class="w-full">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Draw Zones on Snapshot</h2>
-            <ZoneDrawer
-                onFinishZone={sendZone}
-                width={1200}
-                height={675}
-                bind:zones={zones}
-            />
-        </div>
-    </Modal>
 
     <ConfigSetupModal
         open={showConfigModal}

@@ -180,3 +180,130 @@ def get_status():
     except Exception as e:
         logger.error(f"Failed to get AI system status: {e}")
         return {"status": False, "error": str(e)}
+
+@app.get("/config/current")
+def get_current_config():
+    try:
+        location = db_manager.get_latest_location()
+        if not location:
+            return {
+                "status": "no_config",
+                "message": "No configuration found"
+            }
+        location_id, location_name = location
+        zones = db_manager.get_zones_by_location(location_id)
+
+        return {
+            "status": "success",
+            "config": {
+                "location_id": location_id,
+                "location_name": location_name,
+                "zones": zones
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get current configuration: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to get current configuration: {str(e)}"
+        }
+
+@app.get("/config/locations")
+def get_all_locations():
+    """
+    Get all locations with their zone counts.
+    """
+    try:
+        db_manager.cursor.execute("""
+            SELECT l.location_id, l.name, COUNT(z.zone_id) as zone_count
+            FROM location l
+            LEFT JOIN zones z ON l.location_id = z.location_id
+            GROUP BY l.location_id, l.name
+            ORDER BY l.location_id DESC
+        """)
+        rows = db_manager.cursor.fetchall()
+
+        locations = []
+        for row in rows:
+            locations.append({
+                "locationId": row[0],
+                "locationName": row[1],
+                "zoneCount": row[2]
+            })
+
+        return {
+            "status": "success",
+            "locations": locations
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch locations: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+@app.get("/config/location/{location_id}")
+def get_config_by_location(location_id: int):
+    """
+    Get configuration for a specific location.
+    """
+    try:
+        # Get location info
+        db_manager.cursor.execute("""
+            SELECT location_id, name
+            FROM location
+            WHERE location_id = ?
+        """, (location_id,))
+        location = db_manager.cursor.fetchone()
+
+        if not location:
+            return {
+                "status": "error",
+                "message": "Location not found"
+            }
+
+        location_id, location_name = location
+
+        # Get zones for this location
+        zones = db_manager.get_zones_by_location(location_id)
+
+        return {
+            "status": "success",
+            "config": {
+                "locationId": location_id,
+                "locationName": location_name,
+                "zones": zones,
+                "snapshotPath": f"/snapshot?location_id={location_id}"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch config for location {location_id}: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+@app.delete("/config/location/{location_id}")
+def delete_location_config(location_id: int):
+    """
+    Delete a specific location and its zones.
+    """
+    try:
+        # Delete zones for this location
+        db_manager.cursor.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
+
+        # Delete the location
+        db_manager.cursor.execute("DELETE FROM location WHERE location_id = ?", (location_id,))
+
+        db_manager.sqlconn.commit()
+
+        return {
+            "status": "success",
+            "message": "Location deleted successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to delete location {location_id}: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
