@@ -1,5 +1,6 @@
 import sqlite3
 import json
+from device.utils.logger import get_logger
 
 
 class DatabaseManager:

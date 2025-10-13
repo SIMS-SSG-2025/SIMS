@@ -13,6 +13,9 @@ from device.training.dataset.dataset_transform import load_class_mapping
 from device.DeviceRuntime import DeviceRuntime
 
 if __name__ == "__main__":
+    # Initialize logger for main module
+    logger = get_logger("Main")
+
     # -- Setup DB Thread --
     db_queue = queue.Queue(maxsize=100)
     response_queue = queue.Queue()
@@ -24,11 +27,12 @@ if __name__ == "__main__":
     device_runtime = DeviceRuntime(db_queue)
     while True:
         try:
+            # Check system status
             db_queue.put({"action": "get_status", "response": response_queue})
             try:
                 run_flag = response_queue.get(timeout=0.2)
             except queue.Empty:
-                # Maybe log a warning here about no response
+                logger.warning("No response from database worker for status check")
                 run_flag = False
                 time.sleep(1)
                 continue
@@ -36,13 +40,15 @@ if __name__ == "__main__":
             if run_flag:
                 device_runtime.start()
             else:
-                print("Waiting for run flag...")
                 time.sleep(0.5)
 
         except KeyboardInterrupt:
             stop_event.set()
             device_runtime.stop()
             break
+        except Exception as e:
+            logger.error(f"Unexpected error in main loop: {e}")
+            time.sleep(1)
 
     device_runtime.stop()
     stop_event.set()
