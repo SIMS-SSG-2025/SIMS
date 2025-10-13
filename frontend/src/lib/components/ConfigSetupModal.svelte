@@ -1,64 +1,107 @@
 <script lang="ts">
     import Modal from "./modal.svelte";
     import ZoneDrawer from "./ZoneDrawer.svelte";
+    import {
+        fetchCurrentConfig,
+        fetchAllLocations,
+        fetchConfigByLocation,
+        deleteCurrentConfig,
+        deleteLocationConfig,
+        saveConfig,
+        type Zone,
+        type Config,
+        type LocationSummary
+    } from "$lib/api/config";
 
     export let open: boolean = false;
     export let onClose: () => void = () => {};
-
-    type Zone = {
-        points: { x: number; y: number }[];
-        name: string;
-    };
 
     let currentStep = 1;
     let locationName = "";
     let zones: Zone[] = [];
 
     // Stored configuration state
-    let storedConfig: { locationName: string; zones: Zone[]; snapshotPath?: string } | null = null;
+    let storedConfig: Config | null = null;
+    let allLocations: LocationSummary[] = [];
+    let selectedLocationId: number | null = null;
     let isEditingExisting = false;
+    let showNewLocationForm = false;
 
     // Snapshot state
     let snapshotLoading = false;
     let snapshotError: string | null = null;
-    let customSnapshotPath: string = ''; // No default snapshot - user must fetch one
+    let customSnapshotPath: string = '';
 
     // Load stored configuration when modal opens
     $: if (open) {
         loadStoredConfig();
+        loadAllLocations();
     }
 
-    function loadStoredConfig() {
-        const stored = localStorage.getItem('sims-config');
-        if (stored) {
-            try {
-                storedConfig = JSON.parse(stored);
-            } catch (e) {
-                console.error('Error loading stored config:', e);
-                storedConfig = null;
-            }
-        } else {
-            storedConfig = null;
+    async function loadStoredConfig() {
+        storedConfig = await fetchCurrentConfig();
+    }
+
+    async function loadAllLocations() {
+        allLocations = await fetchAllLocations();
+    }
+
+    async function selectLocation(locationId: number) {
+        const config = await fetchConfigByLocation(locationId);
+        if (config) {
+            selectedLocationId = locationId;
+            locationName = config.locationName;
+            zones = [...config.zones];
+            customSnapshotPath = config.snapshotPath || '';
+            isEditingExisting = true;
+            currentStep = 2;
         }
     }
 
     function loadExistingConfig() {
         if (storedConfig) {
+            selectedLocationId = storedConfig.locationId;
             locationName = storedConfig.locationName;
             zones = [...storedConfig.zones];
-            // Load the stored snapshot path if it exists
             customSnapshotPath = storedConfig.snapshotPath || '';
             isEditingExisting = true;
-            currentStep = 2; // Go to zones step
+            currentStep = 2;
         }
     }
 
-    function removeStoredConfig() {
-        localStorage.removeItem('sims-config');
-        storedConfig = null;
+    function startNewLocation() {
+        showNewLocationForm = true;
+        selectedLocationId = null;
         locationName = "";
         zones = [];
+        customSnapshotPath = "";
         isEditingExisting = false;
+    }
+
+    async function removeStoredConfig() {
+        const success = await deleteCurrentConfig();
+        if (success) {
+            storedConfig = null;
+            await loadAllLocations();
+        }
+    }
+
+    async function removeSelectedLocation(locationId: number) {
+        if (confirm("Are you sure you want to delete this location and all its zones?")) {
+            const success = await deleteLocationConfig(locationId);
+            if (success) {
+                await loadAllLocations();
+                if (storedConfig && storedConfig.locationId === locationId) {
+                    storedConfig = null;
+                }
+                if (selectedLocationId === locationId) {
+                    selectedLocationId = null;
+                    locationName = "";
+                    zones = [];
+                    customSnapshotPath = "";
+                }
+            }
+        }
     }
 
     async function fetchSnapshot() {
@@ -77,20 +120,10 @@
             }
 
             const blob = await response.blob();
-
-            // Create a safe filename from location name
-            const safeLocationName = locationName.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const filename = `${safeLocationName}_snapshot.jpg`;
-
-            // Create a blob URL for immediate use
             const blobURL = URL.createObjectURL(blob);
             customSnapshotPath = blobURL;
 
-            // Here we would typically save to static folder, but in a browser environment
-            // we'll use the blob URL directly. In a real implementation, you might want to
-            // send this to your backend to save in the static folder.
             console.log(`Snapshot fetched for location: ${locationName}`);
-            console.log(`Would save as: static/${filename}`);
 
         } catch (err: any) {
             snapshotError = err.message;
@@ -115,18 +148,18 @@
     function prevStep() {
         if (currentStep > 1) {
             currentStep -= 1;
-            // If going back to step 1 and we have a stored config, exit editing mode
-            if (currentStep === 1 && storedConfig) {
+            if (currentStep === 1) {
                 isEditingExisting = false;
+                showNewLocationForm = false;
             }
         }
     }
 
     function goToStep(step: number) {
         currentStep = step;
-        // If going back to step 1 and we have a stored config, exit editing mode
-        if (step === 1 && storedConfig) {
+        if (step === 1) {
             isEditingExisting = false;
+            showNewLocationForm = false;
         }
     }
 
@@ -140,6 +173,8 @@
         zones = [];
         customSnapshotPath = "";
         isEditingExisting = false;
+        showNewLocationForm = false;
+        selectedLocationId = null;
     }
 
     function handleClose() {
@@ -149,41 +184,18 @@
 
     async function handleStart() {
         try {
-            // Save configuration to localStorage including snapshot path
-            const config = {
-                locationName,
-                zones,
-                snapshotPath: customSnapshotPath || undefined
-            };
-            localStorage.setItem('sims-config', JSON.stringify(config));
+            const success = await saveConfig(locationName, zones);
 
-            // Send configuration to server
-            const response = await fetch("http://10.10.67.44:8000/setup_config", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    locationName,
-                    zones
-                })
-            });
+            if (success) {
+                console.log("Configuration sent successfully");
 
-            const result = await response.json();
-
-            if (result.status === "success") {
-                console.log("Configuration sent successfully:", result);
-
-                // Start the monitoring system
                 const startResponse = await fetch("http://10.10.67.44:8000/system/start");
                 const startResult = await startResponse.json();
                 console.log("System start response:", startResult);
 
                 handleClose();
             } else {
-                console.error("Failed to send configuration:", result.message);
-                // You might want to show an error message to the user here
-                alert(`Failed to setup configuration: ${result.message}`);
+                alert("Failed to setup configuration");
             }
         } catch (error: any) {
             console.error("Error setting up configuration:", error);
@@ -191,14 +203,14 @@
         }
     }
 
-    $: canProceedStep1 = locationName.trim().length > 0 || storedConfig !== null;
-    $: canProceedStep2 = true; // Zones are optional
+    $: canProceedStep1 = locationName.trim().length > 0;
+    $: canProceedStep2 = true;
 </script>
 
 <Modal {open} onClose={handleClose} modalClass="p-0 w-full max-w-4xl max-h-[90vh] flex flex-col">
     <div class="w-full flex flex-col h-full min-h-0">
         <!-- Header with Steps - only show during setup flow -->
-        {#if !(storedConfig && currentStep === 1 && !isEditingExisting)}
+        {#if showNewLocationForm || isEditingExisting}
             <div class="border-b border-gray-200 px-6 py-4 flex-shrink-0">
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">Setup Configuration</h2>
 
@@ -240,97 +252,99 @@
         <!-- Content Area -->
         <div class="flex-1 overflow-auto">
             {#if currentStep === 1}
-                <!-- Step 1: Current Setup or New Location -->
+                <!-- Step 1: Location Selection -->
                 <div class="px-6 py-8">
-                    {#if storedConfig}
-                        <!-- Show Current Setup -->
-                        <div class="max-w-2xl mx-auto">
+                    {#if !showNewLocationForm && !isEditingExisting}
+                        <div class="max-w-3xl mx-auto">
                             <div class="text-center mb-6">
-                                <h3 class="text-lg font-semibold text-gray-900 mb-2">Current Setup</h3>
-                                <p class="text-sm text-gray-600">You have an existing monitoring configuration</p>
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2">Choose Configuration</h3>
+                                <p class="text-sm text-gray-600">Select an existing location or create a new one</p>
                             </div>
 
-                            <div class="space-y-4">
-                                <!-- Current Location -->
-                                <div class="bg-white border border-gray-200 rounded-lg p-6">
-                                    <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                                        <svg class="w-4 h-4 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                        </svg>
-                                        Location
-                                    </h4>
-                                    <p class="text-gray-700 font-medium">{storedConfig.locationName}</p>
+                            <!-- Current Active Location -->
+                            {#if storedConfig}
+                                <div class="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <span class="px-2 py-1 bg-blue-600 text-white text-xs font-semibold rounded">ACTIVE</span>
+                                                <h4 class="text-base font-semibold text-gray-900">{storedConfig.locationName}</h4>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mb-3">
+                                                {storedConfig.zones.length} zone{storedConfig.zones.length !== 1 ? 's' : ''} configured
+                                            </p>
+                                            <div class="flex gap-2">
+                                                <button
+                                                    on:click={loadExistingConfig}
+                                                    class="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                                                >
+                                                    Edit Configuration
+                                                </button>
+                                                <button
+                                                    on:click={removeStoredConfig}
+                                                    class="px-3 py-1.5 text-xs font-medium rounded-md border border-red-300 bg-white text-red-700 hover:bg-red-50 transition-colors"
+                                                >
+                                                    Deactivate
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+                            {/if}
 
-                                <!-- Current Zones -->
-                                <div class="bg-white border border-gray-200 rounded-lg p-6">
-                                    <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                                        <svg class="w-4 h-4 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 9m0 8V9m0 0H9"></path>
-                                        </svg>
-                                        Monitoring Zones ({storedConfig.zones.length})
-                                    </h4>
-
-                                    {#if storedConfig.zones.length > 0}
-                                        <div class="space-y-2 mb-4 max-h-32 overflow-y-auto">
-                                            {#each storedConfig.zones as zone, i}
-                                                <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                                    <span class="text-sm font-medium text-gray-700">{zone.name}</span>
-                                                    <span class="text-xs text-gray-500">{zone.points.length} points</span>
+                            <!-- All Locations List -->
+                            {#if allLocations.length > 0}
+                                <div class="mb-6">
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Available Locations</h4>
+                                    <div class="space-y-2 max-h-96 overflow-y-auto">
+                                        {#each allLocations as location}
+                                            <div
+                                                class="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-300 transition-colors
+                                                    {storedConfig && storedConfig.locationId === location.locationId ? 'opacity-50' : ''}"
+                                            >
+                                                <div class="flex-1">
+                                                    <h5 class="text-sm font-medium text-gray-900">{location.locationName}</h5>
+                                                    <p class="text-xs text-gray-500">
+                                                        {location.zoneCount} zone{location.zoneCount !== 1 ? 's' : ''}
+                                                    </p>
                                                 </div>
-                                            {/each}
-                                        </div>
-                                    {:else}
-                                        <div class="mb-4 p-3 bg-gray-50 rounded-lg">
-                                            <p class="text-sm text-gray-600">No zones defined - monitoring covers the entire area</p>
-                                        </div>
-                                    {/if}
-
-                                    <!-- Zone Preview - Always show snapshot if available -->
-                                    {#if storedConfig.snapshotPath}
-                                        <div class="border border-gray-200 rounded-lg overflow-hidden">
-                                            <ZoneDrawer
-                                                onFinishZone={() => {}}
-                                                width={1200}
-                                                height={675}
-                                                zones={storedConfig.zones}
-                                                readOnly={true}
-                                                imageSrc={storedConfig.snapshotPath}
-                                            />
-                                        </div>
-                                    {:else}
-                                        <div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
-                                            <p class="text-sm text-gray-600 text-center">No snapshot saved with this configuration</p>
-                                        </div>
-                                    {/if}
+                                                <div class="flex gap-2">
+                                                    {#if !storedConfig || storedConfig.locationId !== location.locationId}
+                                                        <button
+                                                            on:click={() => selectLocation(location.locationId)}
+                                                            class="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                                        >
+                                                            View
+                                                        </button>
+                                                        <button
+                                                            on:click={() => removeSelectedLocation(location.locationId)}
+                                                            class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    {/if}
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
                                 </div>
+                            {/if}
 
-                                <!-- Action Buttons -->
-                                <div class="flex gap-3 pt-4">
-                                    <button
-                                        on:click={loadExistingConfig}
-                                        class="flex-1 inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
-                                    >
-                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                        </svg>
-                                        Update Configuration
-                                    </button>
-                                    <button
-                                        on:click={removeStoredConfig}
-                                        class="flex-1 inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-md border border-red-300 bg-white text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-colors"
-                                    >
-                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                        Remove Configuration
-                                    </button>
+                            <!-- New Location Button -->
+                            <button
+                                on:click={startNewLocation}
+                                class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors group"
+                            >
+                                <div class="flex items-center justify-center gap-2">
+                                    <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    <span class="text-sm font-medium text-gray-600 group-hover:text-blue-600">Create New Location</span>
                                 </div>
-                            </div>
+                            </button>
                         </div>
                     {:else}
-                        <!-- New Location Setup -->
+                        <!-- New Location Form -->
                         <div class="max-w-md mx-auto">
                             <div class="space-y-4">
                                 <div>
@@ -338,11 +352,11 @@
                                         Location Name
                                     </label>
                                     <input
-                                    id="locationName"
-                                    type="text"
-                                    bind:value={locationName}
-                                    placeholder="e.g., Factory Floor A, Warehouse Entrance..."
-                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                        id="locationName"
+                                        type="text"
+                                        bind:value={locationName}
+                                        placeholder="e.g., Factory Floor A, Warehouse Entrance..."
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                                     />
                                 </div>
                                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -389,56 +403,55 @@
                                     Fetch Snapshot
                                 {/if}
                             </button>
+                            <!-- Error message -->
+                            {#if snapshotError}
+                                <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <div class="flex">
+                                        <svg class="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <div class="ml-2">
+                                            <p class="text-sm text-red-800">{snapshotError}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
+
+                            <!-- Success message -->
+                            {#if customSnapshotPath && customSnapshotPath !== ''}
+                                <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div class="flex">
+                                        <svg class="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <div class="ml-2">
+                                            <p class="text-sm text-green-800">Snapshot fetched successfully! You can now draw zones on the live camera feed.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
                         </div>
 
-                        <!-- Error message -->
-                        {#if snapshotError}
-                            <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                <div class="flex">
-                                    <svg class="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
-                                    <div class="ml-2">
-                                        <p class="text-sm text-red-800">{snapshotError}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        {/if}
-
-                        <!-- Success message -->
-                        {#if customSnapshotPath && customSnapshotPath !== ''}
-                            <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <div class="flex">
-                                    <svg class="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
-                                    <div class="ml-2">
-                                        <p class="text-sm text-green-800">Snapshot fetched successfully! You can now draw zones on the live camera feed.</p>
-                                    </div>
-                                </div>
+                        <!-- Zone Drawer -->
+                        {#if customSnapshotPath}
+                            <ZoneDrawer
+                                onFinishZone={handleFinishZone}
+                                width={1200}
+                                height={675}
+                                bind:zones={zones}
+                                imageSrc={customSnapshotPath}
+                            />
+                        {:else}
+                            <div class="border border-gray-200 rounded-lg p-12 bg-gray-50 text-center">
+                                <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                <h3 class="text-lg font-medium text-gray-900 mb-2">No Snapshot Available</h3>
+                                <p class="text-sm text-gray-600 mb-4">Please fetch a snapshot from the camera to define monitoring zones.</p>
                             </div>
                         {/if}
                     </div>
-
-                    <!-- Zone Drawer -->
-                    {#if customSnapshotPath}
-                        <ZoneDrawer
-                            onFinishZone={handleFinishZone}
-                            width={1200}
-                            height={675}
-                            bind:zones={zones}
-                            imageSrc={customSnapshotPath}
-                        />
-                    {:else}
-                        <div class="border border-gray-200 rounded-lg p-12 bg-gray-50 text-center">
-                            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                            <h3 class="text-lg font-medium text-gray-900 mb-2">No Snapshot Available</h3>
-                            <p class="text-sm text-gray-600 mb-4">Please fetch a snapshot from the camera to define monitoring zones.</p>
-                        </div>
-                    {/if}
                 </div>
             {:else if currentStep === 3}
                 <!-- Step 3: Summary -->
@@ -505,8 +518,8 @@
             {/if}
         </div>
 
-        <!-- Footer with Navigation - only show during setup flow -->
-        {#if !(storedConfig && currentStep === 1 && !isEditingExisting)}
+        <!-- Footer with Navigation -->
+        {#if showNewLocationForm || isEditingExisting}
             <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex-shrink-0">
                 <div class="flex items-center justify-between">
                     <button
@@ -538,7 +551,7 @@
                                 class="inline-flex items-center px-6 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors"
                             >
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10v4a2 2 0 002 2h2a2 2 0 002-2v-4M9 10V9a2 2 0 012-2h2a2 2 0 012 2v1"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10v4a2 2 0 002 2h2a2 2 0 002-2v-4M9 10V9a2 2 0 00-2-2h-2a2 2 0 00-2 2v1"></path>
                                 </svg>
                                 Start Monitoring
                             </button>
