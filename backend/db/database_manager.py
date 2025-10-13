@@ -8,6 +8,14 @@ class DatabaseManager:
         self.sqlconn = sqlite3.connect(self.db_path,check_same_thread=False)
         self.cursor = self.sqlconn.cursor()
 
+    def _location_query(self,specific_location=False):
+        query= """SELECT l.name AS location_name,z.name AS zone_name, COUNT(e.event_id) AS total_events,
+        SUM(e.has_helmet) AS helmets, SUM(e.has_vest) AS vests FROM events e LEFT JOIN zones z ON e.zone_id = z.zone_id
+        LEFT JOIN location l ON e.location_id = l.location_id"""
+        if specific_location:
+            query += " WHERE e.location_id = ?"
+        query += " GROUP BY l.name, z.name"
+        return query
 
     def insert_object(self,object_id,object_type):
 
@@ -28,7 +36,8 @@ class DatabaseManager:
 
     def insert_zone(self, points,name,location_id):
         coords_json = json.dumps(points)
-        self.cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json,name,location_id))
+        self.cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""",
+        (coords_json,name,location_id))
         self.sqlconn.commit()
 
     def fetch_all_zones(self):
@@ -42,7 +51,8 @@ class DatabaseManager:
         return zones
 
     def set_ai_running(self,value: bool):
-        self.cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0,))
+        self.cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",
+        (1 if value else 0,))
         self.sqlconn.commit()
 
     def get_ai_running(self) -> bool:
@@ -58,3 +68,23 @@ class DatabaseManager:
         if result and result[0]:
             return result[0]
         return 0
+
+    def get_events(self):
+        self.cursor.execute("SELECT * from events")
+        rows = self.cursor.fetchall()
+        return rows
+
+    def get_all_location(self):
+        query = self._location_query(specific_location=False)
+        self.cursor.execute(query)
+        rows = self.cursor.fetchall()
+        return [{"location": row[0], "zones": row[1],"total_events": row[2],"helmets": row[3],"vests": row[4] or 0}
+         for row in rows]
+
+
+    def get_location(self,location_id):
+        query = self._location_query(specific_location=True)
+        self.cursor.execute(query,(location_id,))
+        rows = self.cursor.fetchall()
+        return [{"location": row[0], "zones": row[1], "total_events": row[2], "helmets": row[3], "vests": row[4] or 0}
+                for row in rows]
