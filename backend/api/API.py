@@ -66,7 +66,8 @@ def take_snapshot():
         # Ensure the snapshot directory exists
         os.makedirs(snapshot_path, exist_ok=True)
 
-        filename = "snapshot.png"
+         # Save with timestamp to avoid conflicts
+        filename = "snapshot_temp.png"
         file_path = os.path.join(snapshot_path, filename)
         cv2.imwrite(file_path, frame)
         return FileResponse(file_path, media_type="image/png")
@@ -104,7 +105,17 @@ def setup_config(config_data: ConfigData):
             # Create new location
             location_id = db_manager.insert_location(config_data.locationName)
 
+        # Handle snapshot renaming if temp snapshot exists
+        filename = "snapshot_temp.png"
+        file_path = os.path.join(snapshot_path, filename)
+        if os.path.exists(file_path):
+            new_filename = f"snapshot_location_{location_id}.png"
+            new_file_path = os.path.join(snapshot_path, new_filename)
+            os.rename(file_path, new_file_path)
+        else:
+            logger.warning(f"No snapshot found at {file_path} to rename.")
         # Insert zones for this location
+
         zone_count = 0
         for zone in config_data.zones:
             db_manager.insert_zone(zone.points, zone.name, location_id)
@@ -192,13 +203,14 @@ def get_current_config():
             }
         location_id, location_name = location
         zones = db_manager.get_zones_by_location(location_id)
-
         return {
             "status": "success",
             "config": {
                 "location_id": location_id,
                 "location_name": location_name,
-                "zones": zones
+                "zones": zones,
+                "snapshotPath": f"/snapshot/{location_id}"
+
             }
         }
     except Exception as e:
@@ -307,3 +319,8 @@ def delete_location_config(location_id: int):
             "status": "error",
             "message": str(e)
         }
+
+@app.get("/snapshot/{location_id}")
+def get_snapshot_by_location(location_id: int):
+    file_path = os.path.join(snapshot_path, f"snapshot_location_{location_id}.png")
+    return FileResponse(file_path, media_type="image/png")
