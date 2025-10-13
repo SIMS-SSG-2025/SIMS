@@ -58,15 +58,7 @@ class Tracker:
             if not track.is_activated or track_age < frame_age_threshold:
                 continue
 
-            tlwh = track.tlwh
-            x1, y1, w, h= tlwh
-            x2 = x1 + w
-            y2 = y1 + h
-
-            x1 = max(0, x1)
-            y1 = max(0, y1)
-            x2 = min(width, x2)
-            y2 = min(height, y2)
+            x1, y1, x2, y2 = track.xyxy
 
             class_name = self.class_names[int(track.cls)]
 
@@ -85,16 +77,7 @@ class Tracker:
             if not track.is_activated or track_age < frame_age_threshold:
                 continue
 
-
-            tlwh = track.tlwh
-            x1, y1, w, h= tlwh
-            x2 = x1 + w
-            y2 = y1 + h
-
-            x1 = max(0, x1)
-            y1 = max(0, y1)
-            x2 = min(width, x2)
-            y2 = min(height, y2)
+            x1, y1, x2, y2 = track.xyxy
 
             class_name = self.class_names[int(track.cls)]
 

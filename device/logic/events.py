@@ -9,7 +9,8 @@ from ..utils.logger import get_logger
 
 class EventManager:
     def __init__(self, logger, db_queue, class_names):
-        self.active_tracks = []
+        self.active_tracks = set()
+        self.in_zone_objects = set()
         self.zones = None  # Predefined zones can be added here
         # db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
         self.db_queue = db_queue
@@ -33,7 +34,7 @@ class EventManager:
 
             if track_id not in self.active_tracks:
                 # New object detected
-                self.active_tracks.append(track_id)
+                self.active_tracks.add(track_id)
                 if obj["class"] == "Person":
                     obj["ppe"] = []
                     for ppe in ppe_detections:
@@ -43,13 +44,27 @@ class EventManager:
                 self._create_object(obj)
                 self._create_event(obj)
 
-            if self.zones:
+
+
+            if self.zones and obj["class"] == "Person":
                 for zone in self.zones:
-                    if obj["class"] == "Person" and self._check_zone(obj["bbox"], zone["coords"]):
+                    in_zone = self._check_zone(obj["bbox"], zone["coords"])
+                    # If an object has entered the zone - Create an event in the database
+                    if in_zone and obj["track_id"] not in self.in_zone_objects:
                         self._create_event(obj, zone["zone_id"])
+                        self.in_zone_objects.add(obj["track_id"])
+                        break
+                    # If an object leaves the zone - Remove track_id from in_zone_objects
+                    elif not in_zone and obj["track_id"] in self.in_zone_objects:
+                        self.in_zone_objects.remove(obj["track_id"])
                         break
 
-        self.active_tracks = [obj["track_id"] for obj in tracked_objects]
+
+        self.active_tracks = {obj["track_id"] for obj in tracked_objects}
+        self.in_zone_objects = {
+            idx for idx in self.in_zone_objects if idx in self.active_tracks
+        }
+
 
     def _is_overlapping(self, bbox1, bbox2, iou_threshold=0.8):
         """
