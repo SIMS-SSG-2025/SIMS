@@ -22,14 +22,13 @@ app.add_middleware(
 
 
 
-@app.get("/events")
-def fetch_events():
-    sqlconn = sqlite3.connect(db_path)
-    cursor = sqlconn.cursor()
-    cursor.execute("SELECT * FROM events")
-    rows = cursor.fetchall()
-    sqlconn.close()
-    return rows
+@app.get("/locations")
+def fetch_all_locations():
+    return db_manager.get_all_location()
+
+@app.get("/locations/{location_id}")
+def fetch_location(location_id: int):
+    return db_manager.get_location(location_id)
 
 @app.get("/snapshot")
 
@@ -89,3 +88,4 @@ def stop_system():
 def get_status():
     status = db_manager.get_ai_running()
     return {"status": status}
+
