@@ -29,8 +29,15 @@
 
     async function loadConfiguration() {
         configLoading = true;
-        config = await fetchCurrentConfig();
-        configLoading = false;
+        try {
+            config = await fetchCurrentConfig();
+            console.log("Loaded config:", config);
+        } catch (error) {
+            console.error("Error loading configuration:", error);
+            config = null;
+        } finally {
+            configLoading = false;
+        }
     }
 
         // Modal state
@@ -56,6 +63,8 @@
     }
     function closeConfigModal() {
         showConfigModal = false;
+        // Reload configuration after modal closes to reflect any changes
+        loadConfiguration();
     }
     function openLogModal() {
         showLogModal = true;
@@ -105,11 +114,20 @@
 </script>
 
 <header class="w-full bg-white shadow flex items-center justify-between px-8 py-4">
-    <!-- Left: Date & Time -->
-    <div class="flex items-center min-w-[180px]">
+    <!-- Left: Date & Time + Location -->
+    <div class="flex items-center min-w-[180px] gap-4">
         <span class="text-gray-700 font-mono text-lg select-none">
             {now.toLocaleDateString('sv-SE')} {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
         </span>
+        {#if config}
+            <span class="text-sm text-gray-600 border-l pl-4">
+                {config.locationName}
+            </span>
+        {:else if configLoading}
+            <span class="text-sm text-gray-400 border-l pl-4">
+                Loading...
+            </span>
+        {/if}
     </div>
 
     <!-- Center: Range Buttons -->
