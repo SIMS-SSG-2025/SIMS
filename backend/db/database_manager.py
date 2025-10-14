@@ -82,3 +82,14 @@ class DatabaseManager:
         self.cursor.execute("INSERT INTO location (name) VALUES (?)", (name,))
         self.sqlconn.commit()
         return self.cursor.lastrowid
+
+    def get_all_locations(self):
+        self.cursor.execute("""
+        SELECT l.location_id, l.name, COUNT(z.zone_id) as zone_count
+        FROM location l
+        LEFT JOIN zones z ON l.location_id = z.location_id
+        GROUP BY l.location_id, l.name
+        ORDER BY l.location_id DESC
+    """)
+        rows = self.cursor.fetchall()
+        return rows

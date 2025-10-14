@@ -128,3 +128,46 @@ export async function saveConfig(locationName: string, zones: Zone[]): Promise<b
         return false;
     }
 }
+
+export async function fetchSnapshot() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/snapshot`);
+        if (!response.ok) {
+            throw new Error(`Error fetching snapshot: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const blobURL = URL.createObjectURL(blob);
+        return blobURL;
+
+    } catch (err: any) {
+        console.error('Error fetching snapshot:', err);
+        return "";
+    }
+}
+
+export async function startSystem() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/system/start`, {
+            method: "POST"
+        });
+        const startResult = await response.json();
+        return startResult
+    } catch (error) {
+        console.error("Error starting system:", error);
+        return false;
+    }
+}
+
+export async function stopSystem() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/system/stop`, {
+            method: "POST"
+        });
+        const stopResult = await response.json();
+        return stopResult
+    } catch (error) {
+        console.error("Error stopping system:", error);
+        return false;
+    }
+}

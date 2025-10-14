@@ -165,20 +165,20 @@ def get_zones():
         logger.error(f"Failed to fetch zones: {e}")
         raise
 
-@app.get("/system/start")
+@app.post("/system/start")
 def start_system():
     try:
         db_manager.set_ai_running(True)
-        return {"status": "Ai starting"}
+        return {"status": "AI starting"}
     except Exception as e:
         logger.error(f"Failed to start AI system: {e}")
         return {"status": "error", "message": str(e)}
 
-@app.get("/system/stop")
+@app.post("/system/stop")
 def stop_system():
     try:
         db_manager.set_ai_running(False)
-        return {"status": "Ai stopping"}
+        return {"status": "AI stopping"}
     except Exception as e:
         logger.error(f"Failed to stop AI system: {e}")
         return {"status": "error", "message": str(e)}
@@ -226,14 +226,7 @@ def get_all_locations():
     Get all locations with their zone counts.
     """
     try:
-        db_manager.cursor.execute("""
-            SELECT l.location_id, l.name, COUNT(z.zone_id) as zone_count
-            FROM location l
-            LEFT JOIN zones z ON l.location_id = z.location_id
-            GROUP BY l.location_id, l.name
-            ORDER BY l.location_id DESC
-        """)
-        rows = db_manager.cursor.fetchall()
+        rows = db_manager.get_all_locations()
 
         locations = []
         for row in rows:

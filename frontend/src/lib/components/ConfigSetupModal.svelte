@@ -8,6 +8,9 @@
         deleteCurrentConfig,
         deleteLocationConfig,
         saveConfig,
+        fetchSnapshot,
+        startSystem,
+        stopSystem,
         type Zone,
         type Config,
         type LocationSummary
@@ -104,7 +107,7 @@
         }
     }
 
-    async function fetchSnapshot() {
+    async function loadSnapshot() {
         if (!locationName.trim()) {
             snapshotError = "Please enter a location name first";
             return;
@@ -112,25 +115,8 @@
 
         snapshotLoading = true;
         snapshotError = null;
-
-        try {
-            const response = await fetch("http://10.10.67.44:8000/snapshot");
-            if (!response.ok) {
-                throw new Error(`Error fetching snapshot: ${response.statusText}`);
-            }
-
-            const blob = await response.blob();
-            const blobURL = URL.createObjectURL(blob);
-            customSnapshotPath = blobURL;
-
-            console.log(`Snapshot fetched for location: ${locationName}`);
-
-        } catch (err: any) {
-            snapshotError = err.message;
-            console.error('Error fetching snapshot:', err);
-        } finally {
-            snapshotLoading = false;
-        }
+        customSnapshotPath = await fetchSnapshot();
+        snapshotLoading = false;
     }
 
     const steps = [
@@ -189,8 +175,7 @@
             if (success) {
                 console.log("Configuration sent successfully");
 
-                const startResponse = await fetch("http://10.10.67.44:8000/system/start");
-                const startResult = await startResponse.json();
+                let startResult = await startSystem();
                 console.log("System start response:", startResult);
 
                 handleClose();
@@ -386,7 +371,7 @@
                                 <p class="text-xs text-gray-500">Fetch a live snapshot from the camera to draw zones on</p>
                             </div>
                             <button
-                                on:click={fetchSnapshot}
+                                on:click={loadSnapshot}
                                 disabled={snapshotLoading || !locationName.trim()}
                                 class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
