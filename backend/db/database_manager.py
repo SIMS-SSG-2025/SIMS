@@ -6,147 +6,79 @@ from device.utils.logger import get_logger
 class DatabaseManager:
     def __init__(self,db_path):
         self.db_path = db_path
-        self.logger = get_logger("DatabaseManager")
-        self._test_connection()
+        self.sqlconn = sqlite3.connect(self.db_path,check_same_thread=False)
+        self.cursor = self.sqlconn.cursor()
 
-    def _test_connection(self):
-        """Test database connection and log status"""
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
-            table_count = cursor.fetchone()[0]
-            sqlconn.close()
-        except Exception as e:
-            self.logger.error(f"Database connection failed: {e}")
-            raise
 
     def insert_object(self,object_id,object_type):
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("""INSERT INTO object (object_id,type) VALUES (?,?)""", (object_id,object_type))
-            sqlconn.commit()
-            sqlconn.close()
-            self.logger.info(f"Object inserted: ID={object_id}, Type={object_type}")
-        except Exception as e:
-            self.logger.error(f"Failed to insert object: {e}")
-            raise
 
+        self.cursor.execute("""INSERT INTO object (object_id,type) VALUES (?,?)""", (object_id,object_type))
 
     def insert_events(self,object_id,zone_id,location_id,has_helmet,has_vest,time):
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("""INSERT INTO events (object_id,zone_id,location_id,has_helmet,has_vest,time)
-            VALUES (?,?,?,?,?,?)""",
-            (object_id,zone_id,location_id,has_helmet,has_vest,time))
-            event_id = cursor.lastrowid
-            sqlconn.commit()
-            sqlconn.close()
-            self.logger.info(f"Event inserted: ID={event_id}, Object={object_id}, Helmet={has_helmet}, Vest={has_vest}")
-        except Exception as e:
-            self.logger.error(f"Failed to insert event: {e}")
-            raise
+        self.cursor.execute("""INSERT INTO events (object_id,zone_id,location_id,has_helmet,has_vest,time)
+        VALUES (?,?,?,?,?,?)""",
+        (object_id,zone_id,location_id,has_helmet,has_vest,time))
 
 
     def get_event(self):
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("SELECT * from events")
-            rows = cursor.fetchall()
-            sqlconn.close()
-            return rows
-        except Exception as e:
-            self.logger.error(f"Failed to retrieve events: {e}")
-            raise
+        self.cursor.execute("SELECT * from events")
+        rows = self.cursor.fetchall()
 
-    def insert_zone(self, points, name, location_id):
-        try:
-            coords_json = json.dumps(points)
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json, name, location_id))
-            zone_id = cursor.lastrowid
-            sqlconn.commit()
-            sqlconn.close()
-            self.logger.info(f"Zone inserted: ID={zone_id}, Name={name}, Location={location_id}")
-        except Exception as e:
-            self.logger.error(f"Failed to insert zone: {e}")
-            raise
+        return rows
 
-    def insert_location(self, name):
-        """Insert a new location and return its ID"""
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("""INSERT INTO location (name) VALUES (?)""", (name,))
-            location_id = cursor.lastrowid
-            sqlconn.commit()
-            sqlconn.close()
-            self.logger.info(f"Location inserted: ID={location_id}, Name={name}")
-            return location_id
-        except Exception as e:
-            self.logger.error(f"Failed to insert location: {e}")
-            raise
-
-    def get_location_by_name(self, name):
-        """Get location by name, return location_id if exists"""
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("SELECT location_id FROM location WHERE name = ?", (name,))
-            result = cursor.fetchone()
-            sqlconn.close()
-            return result[0] if result else None
-        except Exception as e:
-            self.logger.error(f"Failed to get location by name: {e}")
-            raise
+    def insert_zone(self, points,name,location_id):
+        coords_json = json.dumps(points)
+        self.cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json,name,location_id))
 
     def fetch_all_zones(self):
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("SELECT * from zones")
-            rows = cursor.fetchall()
-            sqlconn.close()
-
-            zones = []
-            for row in rows:
-                zone_id,location_id,coords_json,name = row
-                coords = json.loads(coords_json)
-                zones.append({"zone_id":zone_id,"location_id":location_id,"coords":coords,"name":name})
-
-            return zones
-        except Exception as e:
-            self.logger.error(f"Failed to fetch zones: {e}")
-            raise
+        self.cursor.execute("SELECT * from zones")
+        rows = self.cursor.fetchall()
+        zones = []
+        for row in rows:
+            zone_id,location_id,coords_json,name = row
+            coords = json.loads(coords_json)
+            zones.append({"zone_id":zone_id,"location_id":location_id,"coords":coords,"name":name})
+        return zones
 
     def set_ai_running(self,value: bool):
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0,))
-            sqlconn.commit()
-            sqlconn.close()
-            self.logger.info(f"AI running status updated to: {value}")
-        except Exception as e:
-            self.logger.error(f"Failed to set AI running status: {e}")
-            raise
+        self.cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0,))
 
     def get_ai_running(self) -> bool:
-        try:
-            sqlconn = sqlite3.connect(self.db_path)
-            cursor = sqlconn.cursor()
-            cursor.execute("SELECT ai_running FROM system_config WHERE system_config_id=1")
-            result = cursor.fetchone()
-            sqlconn.close()
-            if result:
-                status = result[0] == 1
-                return status
-            self.logger.warning("No system config found, defaulting to False")
-            return False
-        except Exception as e:
-            self.logger.error(f"Failed to get AI running status: {e}")
-            return False
+        self.cursor.execute("SELECT ai_running FROM system_config WHERE system_config_id=1")
+        result = self.cursor.fetchone()
+        if result:
+            return result[0] == 1
+        return False
+
+    def get_latest_object_id(self):
+        self.cursor.execute("SELECT MAX(object_id) FROM object")
+        result = self.cursor.fetchone()
+        if result and result[0]:
+            return result[0]
+        return 0
+
+    def get_latest_location(self):
+        self.cursor.execute("SELECT location_id, name FROM location ORDER BY location_id DESC LIMIT 1")
+        return self.cursor.fetchone()
+
+    def get_zones_by_location(self, location_id):
+        self.cursor.execute("SELECT * FROM zones WHERE location_id=?", (location_id,))
+        rows = self.cursor.fetchall()
+        zones = []
+        for row in rows:
+            zone_id, loc_id, coords_json, name = row
+            coords = json.loads(coords_json)
+            zones.append({"zone_id": zone_id, "location_id": loc_id, "coords": coords, "name": name})
+        return zones
+
+    def get_location_by_name(self, name):
+        self.cursor.execute("SELECT location_id FROM location WHERE name=?", (name,))
+        result = self.cursor.fetchone()
+        if result:
+            return result[0]
+        return None
+
+    def insert_location(self, name):
+        self.cursor.execute("INSERT INTO location (name) VALUES (?)", (name,))
+        self.sqlconn.commit()
+        return self.cursor.lastrowid

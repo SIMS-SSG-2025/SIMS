@@ -10,6 +10,7 @@ from ..utils.logger import get_logger
 class EventManager:
     def __init__(self, logger, db_queue, class_names):
         self.active_tracks = set()
+        self.tracked_objects_info = {}
         self.in_zone_objects = set()
         self.zones = None  # Predefined zones can be added here
         # db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
@@ -38,8 +39,11 @@ class EventManager:
                 if obj["class"] == "Person":
                     obj["ppe"] = []
                     for ppe in ppe_detections:
-                        if self._is_overlapping(obj["bbox"], ppe[0]):
+                        if self._is_ppe_on_person(obj["bbox"], ppe[0]):
                             obj["ppe"].append(self.class_names[ppe[2]])
+                        #if self._is_overlapping(obj["bbox"], ppe[0]):
+                        #    obj["ppe"].append(self.class_names[ppe[2]])
+                    self.tracked_objects_info[track_id] = obj["ppe"]
 
                 self._create_object(obj)
                 self._create_event(obj)
@@ -47,6 +51,8 @@ class EventManager:
 
 
             if self.zones and obj["class"] == "Person":
+                if track_id in self.tracked_objects_info:
+                    obj["ppe"] = self.tracked_objects_info[track_id]
                 for zone in self.zones:
                     in_zone = self._check_zone(obj["bbox"], zone["coords"])
                     # If an object has entered the zone - Create an event in the database
@@ -64,7 +70,13 @@ class EventManager:
         self.in_zone_objects = {
             idx for idx in self.in_zone_objects if idx in self.active_tracks
         }
+        self.tracked_objects_info = {
+            track_id: ppe for track_id, ppe in self.tracked_objects_info.items() if track_id in self.active_tracks
+        }
 
+    def _is_ppe_on_person(self, person_bbox, ppe_bbox):
+        cx, cy, _, _ = ppe_bbox
+        return (person_bbox[0] <= cx <= person_bbox[2]) and (person_bbox[1] <= cy <= person_bbox[3])
 
     def _is_overlapping(self, bbox1, bbox2, iou_threshold=0.8):
         """
