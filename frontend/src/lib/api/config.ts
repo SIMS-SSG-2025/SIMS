@@ -171,3 +171,17 @@ export async function stopSystem() {
         return false;
     }
 }
+
+export async function activateLocation(locationId: number): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/config/activate/${locationId}`, {
+            method: "POST"
+        });
+
+        const result = await response.json();
+        return result.status === "success";
+    } catch (error) {
+        console.error("Error activating location:", error);
+        return false;
+    }
+}
