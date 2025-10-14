@@ -9,15 +9,24 @@ class DatabaseManager:
         self.sqlconn = sqlite3.connect(self.db_path,check_same_thread=False)
         self.cursor = self.sqlconn.cursor()
 
+        self._configure_pragma()
+
+    def _configure_pragma(self):
+        self.cursor.execute("PRAGMA journal_mode=WAL;")
+        self.cursor.execute("PRAGMA synchronous=NORMAL;")
+        self.sqlconn.commit()
+
 
     def insert_object(self,object_id,object_type):
-
         self.cursor.execute("""INSERT INTO object (object_id,type) VALUES (?,?)""", (object_id,object_type))
+
 
     def insert_events(self,object_id,zone_id,location_id,has_helmet,has_vest,time):
         self.cursor.execute("""INSERT INTO events (object_id,zone_id,location_id,has_helmet,has_vest,time)
         VALUES (?,?,?,?,?,?)""",
         (object_id,zone_id,location_id,has_helmet,has_vest,time))
+
+
 
 
     def get_event(self):
@@ -82,3 +91,10 @@ class DatabaseManager:
         self.cursor.execute("INSERT INTO location (name) VALUES (?)", (name,))
         self.sqlconn.commit()
         return self.cursor.lastrowid
+
+    def insert_object_positions(self, data):
+        self.cursor.executemany("""
+            INSERT INTO object_positions (object_id, location, x, y, time)
+            VALUES (?, ?, ?, ?, ?)
+        """, data)
+        self.sqlconn.commit()

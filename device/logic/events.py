@@ -19,8 +19,9 @@ class EventManager:
         self.logger = logger
         self.detection_logger = get_logger("DETECTION")
         self.class_names = class_names
+        self.object_positions = []
 
-    def handle_detections(self, tracked_objects, ppe_detections):
+    def handle_detections(self, tracked_objects, ppe_detections, store_obj_pos=False):
         """
         Handles detections.
         Creates or updates events in DB as needed.
@@ -64,6 +65,25 @@ class EventManager:
                     elif not in_zone and obj["track_id"] in self.in_zone_objects:
                         self.in_zone_objects.remove(obj["track_id"])
                         break
+
+            if store_obj_pos:
+                timestamp = datetime.datetime.now().isoformat()
+                if obj["class"] == "Person":
+                    x = (obj["bbox"][0] + obj["bbox"][2]) / 2 # x_center: (x1+x2)/2
+                    y = obj["bbox"][3] # bottom (y2)
+                    self.object_positions.append({
+                        "object_id": obj["track_id"],
+                        "location": "loc",
+                        "x": x,
+                        "y": y,
+                        "time": timestamp,
+                    })
+
+        # Flush buffer and store in db
+        if store_obj_pos:
+            if len(self.object_positions) > 100:
+                self._insert_object_positions()
+                self.object_positions.clear()
 
 
         self.active_tracks = {obj["track_id"] for obj in tracked_objects}
@@ -156,6 +176,18 @@ class EventManager:
 
         except Exception as e:
             self.logger.error(f"Failed to create event: {e}")
+
+    def _insert_object_positions(self):
+        try:
+            obj_pos_msg = {
+                "action": "insert_object_positions",
+                "data": self.object_positions.copy(),
+            }
+            self.db_queue.put(obj_pos_msg)
+            self.logger.info(f"Storing object positions in DB")
+        except Exception as e:
+            self.logger.error(f"Failed to insert object positions: {e}")
+
 
     def set_zones(self, zones, frame_width, frame_height):
         processed_zones = []

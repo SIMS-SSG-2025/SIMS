@@ -38,5 +38,14 @@ def db_worker(db_queue, stop_event, db_path="backend/db/events.db"):
             if "response" in msg:
                 msg["response"].put(zones)
 
+        elif msg["action"] == "insert_object_positions":
+            data = msg["data"]
+            data_db = [
+                (d["object_id"], d["location"], d["x"], d["y"], d["time"])
+                for d in data
+            ]
+            db_manager.insert_object_positions(data_db)
+
+
 
     print("DB thread exited.")
