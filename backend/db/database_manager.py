@@ -11,14 +11,14 @@ class DatabaseManager:
 
 
     def insert_object(self,object_id,object_type):
-
         self.cursor.execute("""INSERT INTO object (object_id,type) VALUES (?,?)""", (object_id,object_type))
+        self.sqlconn.commit()
 
     def insert_events(self,object_id,zone_id,location_id,has_helmet,has_vest,time):
         self.cursor.execute("""INSERT INTO events (object_id,zone_id,location_id,has_helmet,has_vest,time)
         VALUES (?,?,?,?,?,?)""",
         (object_id,zone_id,location_id,has_helmet,has_vest,time))
-
+        self.sqlconn.commit()
 
     def get_event(self):
         self.cursor.execute("SELECT * from events")
@@ -29,6 +29,7 @@ class DatabaseManager:
     def insert_zone(self, points,name,location_id):
         coords_json = json.dumps(points)
         self.cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json,name,location_id))
+        self.sqlconn.commit()
 
     def fetch_all_zones(self):
         self.cursor.execute("SELECT * from zones")
@@ -42,6 +43,7 @@ class DatabaseManager:
 
     def set_ai_running(self,value: bool):
         self.cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0,))
+        self.sqlconn.commit()
 
     def get_ai_running(self) -> bool:
         self.cursor.execute("SELECT ai_running FROM system_config WHERE system_config_id=1")
