@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from device.utils.logger import get_logger
-
+import datetime
 
 class DatabaseManager:
     def __init__(self,db_path):
@@ -89,3 +89,16 @@ class DatabaseManager:
         rows = self.cursor.fetchall()
         return [{"location": row[0], "zones": row[1], "total_events": row[2], "helmets": row[3], "vests": row[4] or 0}
                 for row in rows]
+
+    def get_events_by_date(self,location_id: int, start_date: str, end_date: str):
+        query = """ SELECT * FROM events WHERE location_id = ? AND DATE(time) BETWEEN ? AND ? ORDER BY time"""
+
+        self.cursor.execute(query,(location_id,start_date,end_date))
+        rows = self.cursor.fetchall()
+        columns = [desc[0] for desc in self.cursor.description]
+        results = [dict(zip(columns,rows)) for rows in rows]
+        return results
+
+    def __del__(self):
+        if hasattr(self, "sqlconn"):
+            self.sqlconn.close()
