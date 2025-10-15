@@ -20,7 +20,7 @@
         title?: string;
     };
 
-    let { labels, datasets, title = "Bar Chart" }: BarChartProps = $props();
+    let { labels, datasets, title = "" }: BarChartProps = $props();
 
     let canvasElement: HTMLCanvasElement;
     let chart: Chart | null = null;

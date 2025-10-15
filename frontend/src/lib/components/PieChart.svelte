@@ -16,7 +16,7 @@
         isDoughnut?: boolean;
     };
 
-    let { labels, data, backgroundColor, title = "Pie Chart", isDoughnut = true }: PieChartProps = $props();
+    let { labels, data, backgroundColor, title = "  ", isDoughnut = true }: PieChartProps = $props();
 
     let canvasElement: HTMLCanvasElement;
     let chart: Chart | null = null;

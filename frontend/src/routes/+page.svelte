@@ -196,88 +196,75 @@
 
 </script>
 
-<header class="w-full bg-white shadow flex items-center justify-between px-8 py-4">
-    <!-- Left: Date & Time + Location -->
-    <div class="flex items-center min-w-[180px] gap-4">
-        <span class="text-gray-700 font-mono text-lg select-none">
-            {now.toLocaleDateString('sv-SE')} {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
-        </span>
-        {#if config}
-            <span class="text-sm text-gray-600 border-l pl-4">
-                {config.locationName}
-            </span>
-        {:else if configLoading}
-            <span class="text-sm text-gray-400 border-l pl-4">
-                Loading...
-            </span>
-        {/if}
-    </div>
+<header class="w-full bg-gray-50 py-12">
+    <div class="max-w-7xl mx-auto px-8 flex items-center justify-between">
+        <!-- Left: Tab Navigation -->
+        <div class="flex gap-2 bg-white p-1 rounded-lg shadow-sm">
+            <button
+                class="px-6 py-2 rounded-md font-semibold transition
+                    {activeTab === 'dashboard'
+                        ? 'bg-[#E76A23] text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                onclick={() => activeTab = 'dashboard'}
+            >
+                Dashboard
+            </button>
+            <button
+                class="px-6 py-2 rounded-md font-semibold transition
+                    {activeTab === 'area'
+                        ? 'bg-[#E76A23] text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                onclick={() => activeTab = 'area'}
+            >
+                Area Management
+            </button>
+        </div>
 
-    <!-- Center: Tab Navigation -->
-    <div class="flex gap-2 bg-gray-100 p-1 rounded-full">
-        <button
-            class="px-6 py-2 rounded-full font-semibold transition
-                {activeTab === 'dashboard'
-                    ? 'bg-[#E76A23] text-white shadow'
-                    : 'bg-gray-100 text-gray-700 hover:bg-orange-50'}"
-            onclick={() => activeTab = 'dashboard'}
-        >
-            Dashboard
-        </button>
-        <button
-            class="px-6 py-2 rounded-full font-semibold transition
-                {activeTab === 'area'
-                    ? 'bg-[#E76A23] text-white shadow'
-                    : 'bg-gray-100 text-gray-700 hover:bg-orange-50'}"
-            onclick={() => activeTab = 'area'}
-        >
-            Area Management
-        </button>
+        <!-- Right: Settings -->
+        <div class="flex items-center gap-2">
+            <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            </button>
+            <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Settings" onclick={openSettingsModal}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2" />
+                </svg>
+            </button>
+        </div>
     </div>
+</header>
 
-<!-- Right: Settings -->
-    <div class="flex items-center gap-2 min-w-[120px] justify-end">
-        <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-        </button>
-        <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Settings" onclick={openSettingsModal}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2" />
-            </svg>
-        </button>
-    <Modal open={showSettingsModal} onClose={closeSettingsModal} modalClass="p-6 w-full max-w-md max-h-[90vh]">
-        <div class="w-full">
-            <h2 class="text-xl font-semibold text-gray-800 mb-6">Settings</h2>
-            <div class="space-y-4">
-                <button
-                    class="w-full px-4 py-3 bg-[#E76A23] text-white rounded-lg hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center justify-center gap-2"
-                    onclick={openLogModal}
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+<Modal open={showSettingsModal} onClose={closeSettingsModal} modalClass="p-6 w-full max-w-md max-h-[90vh]">
+    <div class="w-full">
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">Settings</h2>
+        <div class="space-y-4">
+            <button
+                class="w-full px-4 py-3 bg-[#E76A23] text-white rounded-lg hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center justify-center gap-2"
+                onclick={openLogModal}
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                     View Logs
                 </button>
             </div>
         </div>
     </Modal>
-    </div>
-</header>
 
 <!-- MAIN CONTENT -->
 <main class="bg-gray-50 min-h-screen">
     {#if activeTab === 'dashboard'}
         <!-- Time Range Selector (below header, only for dashboard) -->
-        <div class="px-8 py-4 bg-white border-b">
-            <div class="flex gap-2 justify-center max-w-7xl mx-auto">
+        <div>
+            <div class="max-w-7xl mx-auto px-8 flex gap-2">
                 {#each ranges as r}
                     <button
-                        class="px-4 py-2 rounded-full font-semibold transition text-sm
+                        class="px-4 py-2 rounded-lg font-semibold transition text-sm
                             {selectedRange === r.value
-                                ? 'bg-[#E76A23] text-white shadow'
-                                : 'bg-gray-100 text-gray-700 hover:bg-orange-50'}"
+                                ? 'bg-[#E76A23] text-white'
+                                : 'bg-white text-gray-700 hover:bg-orange-50 border border-gray-200'}"
                         onclick={() => selectRange(r.value)}
                     >
                         {r.label}
