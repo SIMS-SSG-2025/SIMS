@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI,Query
 from pydantic import BaseModel
 from typing import List
 import sqlite3
@@ -175,3 +175,7 @@ def get_status():
     except Exception as e:
         logger.error(f"Failed to get AI system status: {e}")
         return {"status": False, "error": str(e)}
+
+@app.get("/events_time")
+def get_events_time(location_id: int, start_date: str, end_date: str):
+    return db_manager.get_events_by_date(location_id, start_date, end_date)
