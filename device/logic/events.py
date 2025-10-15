@@ -42,7 +42,7 @@ class EventManager:
                     obj["ppe"] = []
                     for ppe in ppe_detections:
                         if self._is_ppe_on_person(obj["bbox"], ppe[0]):
-                            obj["ppe"].append(self.class_names[ppe[2]])
+                            obj["ppe"].append(self.ppe_names[ppe[2]])
                         #if self._is_overlapping(obj["bbox"], ppe[0]):
                         #    obj["ppe"].append(self.class_names[ppe[2]])
                     self.tracked_objects_info[track_id] = obj["ppe"]
