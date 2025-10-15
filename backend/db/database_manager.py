@@ -159,3 +159,16 @@ class DatabaseManager:
         """Get all events from the database."""
         self.cursor.execute("SELECT * FROM events")
         return self.cursor.fetchall()
+
+    def get_events_by_date(self, location_id: int, start_date: str, end_date: str):
+        query = """ SELECT * FROM events WHERE location_id = ? AND DATE(time) BETWEEN ? AND ? ORDER BY time"""
+
+        self.cursor.execute(query,(location_id,start_date,end_date))
+        rows = self.cursor.fetchall()
+        columns = [desc[0] for desc in self.cursor.description]
+        results = [dict(zip(columns,rows)) for rows in rows]
+        return results
+
+    def __del__(self):
+        if hasattr(self, "sqlconn"):
+            self.sqlconn.close()

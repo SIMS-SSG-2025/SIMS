@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 from typing import List
 from fastapi.responses import FileResponse
@@ -388,3 +388,7 @@ def get_snapshot_by_location(location_id: int):
     except Exception as e:
         logger.error(f"Error retrieving snapshot: {e}")
         return {"error": f"Failed to retrieve snapshot: {str(e)}"}
+
+@app.get("/events_time")
+def get_events_time(location_id: int, start_date: str, end_date: str):
+    return db_manager.get_events_by_date(location_id, start_date, end_date)

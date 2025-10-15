@@ -1,6 +1,5 @@
 
 <script lang="ts">
-    import LineChart from "$lib/components/LineChart.svelte";
     import BarChart from "$lib/components/BarChart.svelte";
     import PieChart from "$lib/components/PieChart.svelte";
     import Modal from "$lib/components/modal.svelte";
@@ -166,33 +165,6 @@
             openDateRangePicker();
         } else {
             customTimeRange = null;
-        }
-    }
-
-    let snapshotURL: string | null = null;
-    let loading = false;
-    let error: string | null = null;
-
-    type Event = {
-        message: string;
-    };
-
-    let events: Event[] = [];
-
-    async function loadEvents() {
-        loading = true;
-        error = null;
-        try {
-            const response = await fetch("http://10.10.67.45:8000/events");
-            if (!response.ok) {
-                throw new Error(`Error fetching events: ${response.statusText}`);
-            }
-            events = await response.json();
-            console.log(events);
-        } catch (err: any) {
-            error = err.message;
-        } finally {
-            loading = false;
         }
     }
 
