@@ -22,6 +22,8 @@
         fetchPPEComplianceData
     } from "$lib/api/stats";
 
+    import { Settings, Download, PersonStanding, Car, TriangleAlert, Ban } from "lucide-svelte";
+
     let now = $state(new Date());
     let interval: any;
     let selectedRange = $state<TimeRangeOption>("day");
@@ -223,14 +225,10 @@
         <!-- Right: Settings -->
         <div class="flex items-center gap-2">
             <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
+                <Download size={24} class="text-gray-600" />
             </button>
             <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Settings" onclick={openSettingsModal}>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2" />
-                </svg>
+                <Settings size={24} class="text-gray-600" />
             </button>
         </div>
     </div>
