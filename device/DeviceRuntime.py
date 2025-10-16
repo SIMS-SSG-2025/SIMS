@@ -176,10 +176,16 @@ class DeviceRuntime:
         self.db_queue.put({"action": "get_latest_object_id", "response": self.response_queue})
         try:
             last_object_id = self.response_queue.get(timeout=0.1)
-
-
         except queue.Empty:
             print("No objects fetched.")
+
+        self.db_queue.put({"action": "get_location_id", "response": self.response_queue})
+        try:
+            location_id = self.response_queue.get(timeout=0.1)
+            self.event_manager.set_location(location_id)
+        except queue.Empty:
+            print("No location ID fetched.")
+
     """
     # Update the configuration if needed
     # get zones from db
