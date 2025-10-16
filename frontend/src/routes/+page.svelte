@@ -1,4 +1,3 @@
-
 <script lang="ts">
     import BarChart from "$lib/components/BarChart.svelte";
     import PieChart from "$lib/components/PieChart.svelte";
@@ -16,7 +15,8 @@
         type DetectionBarChartData,
         type PPEComplianceData,
         calculateTimeRange,
-        fetchStats,
+        fetchEventsForLocation,
+        calculateStatsFromEvents,
         fetchDetectionBarChartData,
         fetchPPEComplianceData
     } from "$lib/api/stats";
@@ -53,6 +53,8 @@
         missingBoth: 0
     });
 
+    let lastFetchTime = $state<Date | null>(null);
+    let pollingInterval: any;
 
     onMount(() => {
         interval = setInterval(() => {
@@ -60,10 +62,16 @@
         }, 1000);
 
         loadConfiguration();
-        loadStatistics();
+        loadStatistics(true); // Initial load
+
+        // Start polling every 5 seconds
+        pollingInterval = setInterval(() => {
+            loadStatistics(false); // Incremental load
+        }, 5000);
 
         return () => {
             clearInterval(interval);
+            clearInterval(pollingInterval);
         };
     });
 
@@ -72,6 +80,11 @@
         try {
             config = await fetchCurrentConfig();
             console.log("Loaded config:", $state.snapshot(config));
+
+            // Reload statistics once config is available (we need location ID for real data)
+            if (config && config.locationId) {
+                await loadStatistics();
+            }
         } catch (error) {
             console.error("Error loading configuration:", error);
             config = null;
@@ -80,25 +93,73 @@
         }
     }
 
-    async function loadStatistics() {
+    async function loadStatistics(isInitialLoad = false) {
         statsLoading = true;
         try {
             const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
 
-            // Load all data in parallel
-            const [statsData, chartData, ppeData] = await Promise.all([
-                fetchStats(timeRange),
-                fetchDetectionBarChartData(timeRange),
-                fetchPPEComplianceData()
-            ]);
+            if (config && config.locationId) {
+                try {
+                    let response;
 
-            stats = statsData;
-            detectionChartData = chartData;
-            ppeComplianceData = ppeData;
+                    if (isInitialLoad || !lastFetchTime) {
+                        // Initial load: fetch all data for the time range
+                        response = await fetchEventsForLocation(config.locationId, timeRange);
+                        lastFetchTime = new Date();
 
-            console.log("Loaded stats:", $state.snapshot(stats));
-            console.log("Loaded chart data:", $state.snapshot(detectionChartData));
-            console.log("Loaded PPE data:", $state.snapshot(ppeComplianceData));
+                        // Calculate stats for initial load
+                        stats = calculateStatsFromEvents(response.events);
+                        console.log("Loaded real stats from events:", $state.snapshot(stats));
+
+                        // Only update charts on initial load
+                        const [chartData, ppeData] = await Promise.all([
+                            fetchDetectionBarChartData(timeRange),
+                            fetchPPEComplianceData()
+                        ]);
+                        detectionChartData = chartData;
+                        ppeComplianceData = ppeData;
+                    } else {
+                        // Incremental load: fetch only new events since last fetch
+                        const incrementalRange = {
+                            start: lastFetchTime,
+                            end: new Date()
+                        };
+                        response = await fetchEventsForLocation(config.locationId, incrementalRange);
+
+                        // Merge new events with existing stats
+                        if (response.count > 0) {
+                            const newStats = calculateStatsFromEvents(response.events);
+                            stats = {
+                                detectedPersons: stats.detectedPersons + newStats.detectedPersons,
+                                detectedVehicles: stats.detectedVehicles + newStats.detectedVehicles,
+                                ppeBreaches: stats.ppeBreaches + newStats.ppeBreaches,
+                                forbiddenZoneEntries: stats.forbiddenZoneEntries + newStats.forbiddenZoneEntries
+                            };
+                            console.log(`Added ${response.count} new events to stats`);
+                        }
+
+                        lastFetchTime = new Date();
+                        // Don't update charts on incremental loads
+                    }
+                } catch (error) {
+                    console.error("Error fetching events for stats:", error);
+                    // Fallback to zeros on error
+                    stats = {
+                        detectedPersons: 0,
+                        detectedVehicles: 0,
+                        ppeBreaches: 0,
+                        forbiddenZoneEntries: 0
+                    };
+                }
+            } else if (isInitialLoad) {
+                // No config but initial load - load mock chart data
+                const [chartData, ppeData] = await Promise.all([
+                    fetchDetectionBarChartData(timeRange),
+                    fetchPPEComplianceData()
+                ]);
+                detectionChartData = chartData;
+                ppeComplianceData = ppeData;
+            }
         } catch (error) {
             console.error("Error loading statistics:", error);
         } finally {
@@ -106,10 +167,11 @@
         }
     }
 
-    // Reload stats when time range changes
+    // Reload stats when time range changes (only if we have config)
     $effect(() => {
-        if (selectedRange) {
-            loadStatistics();
+        if (selectedRange && config?.locationId) {
+            lastFetchTime = null; // Reset to force full load
+            loadStatistics(true);
         }
     });
 

@@ -13,6 +13,7 @@ class EventManager:
         self.tracked_objects_info = {}
         self.in_zone_objects = set()
         self.zones = None  # Predefined zones can be added here
+        self.location = None
         # db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
         self.db_queue = db_queue
         # self.database = DatabaseManager(db_path=db_path)
@@ -136,7 +137,7 @@ class EventManager:
                 "action": "insert_event",
                 "object_id": obj["track_id"],
                 "zone_id": zone_id,
-                "location": "lager1",
+                "location": self.location,
                 "helmet": has_helmet,
                 "vest": has_vest,
                 "time": datetime.datetime.now().isoformat(),
@@ -186,3 +187,6 @@ class EventManager:
             coords = zone["coords"]
             zone_coords.append(coords)
         return zone_coords
+
+    def set_location(self, location_id):
+        self.location = location_id
