@@ -83,14 +83,11 @@ class DeviceRuntime:
                 detections = run_inference(rgb_frame, self.model)
                 # Filter detections by class
                 trackable_classes = ["Person", "vehicle"]
-                # trackable_classes = ["Hardhat", "Safety Vest", "NO-Hardhat", "NO-Safety Vest"]
-                ppe_classes = ["Hardhat", "Safety Vest",]
                 detections_for_tracking = [d for d in detections if self.class_names[d[-1]] in trackable_classes]
                 results = DetectionResults(detections_for_tracking)
-                ppe_detections = [d for d in detections if self.class_names[d[-1]] in ppe_classes]
 
                 # Update tracking and handle events
-                tracked_objects, in_frame_objects = self.tracker.update(results, frame)
+                tracked_objects, in_frame_objects = self.tracker.update(results, rgb_frame)
 
                 if self.frame_count % self.FRAME_SAMPLE == 0:
                     self.event_manager.handle_detections(tracked_objects, rgb_frame, store_obj_pos=True)
