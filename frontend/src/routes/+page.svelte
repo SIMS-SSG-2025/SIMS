@@ -167,15 +167,7 @@
         }
     }
 
-    // Reload stats when time range changes (only if we have config)
-    $effect(() => {
-        if (selectedRange && config?.locationId) {
-            lastFetchTime = null; // Reset to force full load
-            loadStatistics(true);
-        }
-    });
-
-        // Modal state
+    // Modal state
     let showSettingsModal = $state(false);
     let showConfigModal = $state(false);
     let showLogModal = $state(false);
@@ -194,6 +186,9 @@
         showConfigModal = false;
         // Reload configuration after modal closes to reflect any changes
         loadConfiguration();
+        // Reload stats with new config (reset for full load)
+        lastFetchTime = null;
+        loadStatistics(true);
     }
     function openLogModal() {
         showLogModal = true;
@@ -210,6 +205,9 @@
     function handleDateRangeApply(start: Date, end: Date) {
         customTimeRange = { start, end };
         selectedRange = 'custom';
+        // Reload stats with new custom range
+        lastFetchTime = null;
+        loadStatistics(true);
     }
 
     const ranges: { label: string; value: TimeRangeOption }[] = [
@@ -221,12 +219,18 @@
     ];
 
     function selectRange(val: TimeRangeOption) {
+        const rangeChanged = selectedRange !== val;
         selectedRange = val;
         // If custom is selected, open the date picker
         if (val === 'custom') {
             openDateRangePicker();
         } else {
             customTimeRange = null;
+            // Reload stats if range actually changed
+            if (rangeChanged && config?.locationId) {
+                lastFetchTime = null;
+                loadStatistics(true);
+            }
         }
     }
 

@@ -11,6 +11,7 @@
         fetchSnapshot,
         startSystem,
         stopSystem,
+        getSystemStatus,
         activateLocation,
         type Zone,
         type Config,
@@ -36,6 +37,8 @@
     let snapshotLoading = false;
     let snapshotError: string | null = null;
     let customSnapshotPath: string = '';
+    let startingSystem = false;
+    let systemStatusMessage: string = '';
 
     // Load stored configuration when modal opens
     $: if (open) {
@@ -79,16 +82,50 @@
     }
 
     async function makeLocationActive(locationId: number) {
-        const success = await activateLocation(locationId);
-        if (success) {
-            await startSystem();
-            await loadStoredConfig();
-            await loadAllLocations();
-            console.log("Location activated and system started");
-            // Return to list view to show the new active location
-            viewMode = "list";
-        } else {
-            alert("Failed to activate location");
+        try {
+            startingSystem = true;
+            systemStatusMessage = '';
+
+            // Check if system is currently running
+            const isRunning = await getSystemStatus();
+
+            if (isRunning) {
+                // Stop the system first
+                systemStatusMessage = 'Stopping current monitoring...';
+                await stopSystem();
+                console.log("System stopped, waiting for device polling cycle...");
+
+                // Wait 5 seconds for device to detect the stop
+                systemStatusMessage = 'Waiting for system to stop...';
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+
+            // Activate the new location configuration
+            systemStatusMessage = 'Activating location...';
+            const success = await activateLocation(locationId);
+
+            if (success) {
+                // Start the system with the new config
+                systemStatusMessage = 'Starting monitoring...';
+                await startSystem();
+                await loadStoredConfig();
+                await loadAllLocations();
+
+                console.log("Location activated and system started");
+                systemStatusMessage = '';
+
+                // Return to list view to show the new active location
+                viewMode = "list";
+            } else {
+                systemStatusMessage = '';
+                alert("Failed to activate location");
+            }
+        } catch (error: any) {
+            console.error("Error activating location:", error);
+            systemStatusMessage = '';
+            alert(`Error: ${error.message}`);
+        } finally {
+            startingSystem = false;
         }
     }
 
@@ -206,21 +243,51 @@
 
     async function handleStart() {
         try {
+            startingSystem = true;
+            systemStatusMessage = '';
+
+            // Check if system is currently running
+            const isRunning = await getSystemStatus();
+
+            if (isRunning) {
+                // Stop the system first
+                systemStatusMessage = 'Stopping current monitoring...';
+                await stopSystem();
+                console.log("System stopped, waiting for device polling cycle...");
+
+                // Wait 5 seconds for device to detect the stop
+                systemStatusMessage = 'Waiting for system to stop...';
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+
+            // Save the new configuration
+            systemStatusMessage = 'Saving configuration...';
             const success = await saveConfig(locationName, zones);
 
             if (success) {
-                console.log("Configuration sent successfully");
+                console.log("Configuration saved successfully");
 
+                // Start the system with new config
+                systemStatusMessage = 'Starting monitoring with new configuration...';
                 let startResult = await startSystem();
                 console.log("System start response:", startResult);
 
+                systemStatusMessage = 'Monitoring started successfully!';
+
+                // Brief delay to show success message
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
                 handleClose();
             } else {
+                systemStatusMessage = '';
                 alert("Failed to setup configuration");
             }
         } catch (error: any) {
             console.error("Error setting up configuration:", error);
+            systemStatusMessage = '';
             alert(`Error: ${error.message}`);
+        } finally {
+            startingSystem = false;
         }
     }
 
@@ -420,12 +487,20 @@
                             {#if !storedConfig || selectedLocationId !== storedConfig.locationId}
                                 <button
                                     on:click={() => makeLocationActive(selectedLocationId!)}
-                                    class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium shadow-sm flex items-center justify-center gap-2"
+                                    disabled={startingSystem}
+                                    class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                    </svg>
-                                    Set as Active
+                                    {#if startingSystem}
+                                        <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        {systemStatusMessage || 'Activating...'}
+                                    {:else}
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Set as Active
+                                    {/if}
                                 </button>
                             {/if}
                             <button
@@ -805,12 +880,20 @@
                         {:else}
                             <button
                                 on:click={handleStart}
-                                class="inline-flex items-center px-6 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors"
+                                disabled={startingSystem}
+                                class="inline-flex items-center px-6 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10v4a2 2 0 002 2h2a2 2 0 002-2v-4M9 10V9a2 2 0 00-2-2h-2a2 2 0 00-2 2v1"></path>
-                                </svg>
-                                Start Monitoring
+                                {#if startingSystem}
+                                    <svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    {systemStatusMessage || 'Starting...'}
+                                {:else}
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10v4a2 2 0 002 2h2a2 2 0 002-2v-4M9 10V9a2 2 0 00-2-2h-2a2 2 0 00-2 2v1"></path>
+                                    </svg>
+                                    Start Monitoring
+                                {/if}
                             </button>
                         {/if}
                     </div>

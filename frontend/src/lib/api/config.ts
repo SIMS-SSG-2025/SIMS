@@ -122,6 +122,7 @@ export async function saveConfig(locationName: string, zones: Zone[]): Promise<b
         });
 
         const result = await response.json();
+        console.log(result)
         return result.status === "success";
     } catch (error) {
         console.error("Error saving config:", error);
@@ -168,6 +169,17 @@ export async function stopSystem() {
         return stopResult
     } catch (error) {
         console.error("Error stopping system:", error);
+        return false;
+    }
+}
+
+export async function getSystemStatus(): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/system/status`);
+        const result = await response.json();
+        return result.status === true;
+    } catch (error) {
+        console.error("Error getting system status:", error);
         return false;
     }
 }
