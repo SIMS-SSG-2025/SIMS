@@ -45,6 +45,11 @@ def db_worker(db_queue, stop_event, db_path="backend/db/events.db"):
                 for d in data
             ]
             db_manager.insert_object_positions(data_db)
+        elif msg["action"] == "get_location_id":
+            location = db_manager.get_active_location()
+            location_id = location[0] if location else None
+            if "response" in msg:
+                msg["response"].put(location_id)
 
 
 

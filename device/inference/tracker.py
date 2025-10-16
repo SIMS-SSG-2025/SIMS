@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 from ultralytics.trackers.bot_sort import BOTSORT
-from ultralytics.trackers.basetrack import BaseTrack
 import numpy as np
 from ultralytics.trackers.basetrack import BaseTrack
 class DetectionResults:
@@ -22,7 +21,7 @@ class DetectionResults:
             self.cls = dets_array[:, 5].astype(int)
 
 class Tracker:
-    def __init__(self, class_names, cam_fps, with_reid=True, reid_model="yolov8n-cls.pt"):
+    def __init__(self, class_names, cam_fps, with_reid=True, reid_model="yolo11n-cls.pt"):
         args = SimpleNamespace(
             track_buffer=360,
             track_high_thresh=0.3,
@@ -38,7 +37,6 @@ class Tracker:
         )
 
         self.tracker = BOTSORT(args, frame_rate=int(cam_fps))
-        # self.tracker.encoder.model.device.to("cuda") to gpu
         self.class_names = class_names
 
     def update(self, detections, frame):
