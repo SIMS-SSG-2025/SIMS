@@ -5,6 +5,8 @@ export interface DashboardStats {
     detectedPersons: number;
     detectedVehicles: number;
     ppeBreaches: number;
+    helmetBreaches: number;
+    vestBreaches: number;
     forbiddenZoneEntries: number;
 }
 
@@ -94,6 +96,8 @@ export function getMockStats(timeRange: TimeRange): DashboardStats {
         detectedPersons: Math.floor(Math.random() * 1000) + 100,
         detectedVehicles: Math.floor(Math.random() * 500) + 50,
         ppeBreaches: Math.floor(Math.random() * 50) + 5,
+        helmetBreaches: Math.floor(Math.random() * 30) + 3,
+        vestBreaches: Math.floor(Math.random() * 25) + 2,
         forbiddenZoneEntries: Math.floor(Math.random() * 30) + 2
     };
 }
@@ -298,6 +302,8 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
     let detectedPersons = 0;
     let detectedVehicles = 0;
     let ppeBreaches = 0;
+    let helmetBreaches = 0;
+    let vestBreaches = 0;
     let forbiddenZoneEntries = 0;
 
     // Track unique objects to avoid counting duplicates
@@ -316,9 +322,21 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
             ppeBreaches++;
         }
 
+        // Count helmet breaches specifically
+        if (!event.has_helmet) {
+            helmetBreaches++;
+        }
+
+        // Count vest breaches specifically
+        if (!event.has_vest) {
+            vestBreaches++;
+        }
+
         // Count forbidden zone entries (this assumes all events are zone entries)
         // You might want to add a flag in your Event type to distinguish entry types
-        forbiddenZoneEntries++;
+        if (event.zone_id != null) {
+            forbiddenZoneEntries++;
+        }
     });
 
     detectedPersons = uniquePersons.size;
@@ -328,6 +346,8 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
         detectedPersons,
         detectedVehicles,
         ppeBreaches,
+        helmetBreaches,
+        vestBreaches,
         forbiddenZoneEntries
     };
 }

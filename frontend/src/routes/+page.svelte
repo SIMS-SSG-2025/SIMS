@@ -5,6 +5,7 @@
     import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
     import LogModal from "$lib/components/LogModal.svelte";
     import StatCard from "$lib/components/StatCard.svelte";
+    import StatCardMulti from "$lib/components/StatCardMulti.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
     import { onMount } from "svelte";
     import { fetchCurrentConfig, type Config } from "$lib/api/config";
@@ -36,6 +37,8 @@
         detectedPersons: 0,
         detectedVehicles: 0,
         ppeBreaches: 0,
+        helmetBreaches: 0,
+        vestBreaches: 0,
         forbiddenZoneEntries: 0
     });
     let statsLoading = $state(false);
@@ -133,6 +136,8 @@
                                 detectedPersons: stats.detectedPersons + newStats.detectedPersons,
                                 detectedVehicles: stats.detectedVehicles + newStats.detectedVehicles,
                                 ppeBreaches: stats.ppeBreaches + newStats.ppeBreaches,
+                                helmetBreaches: stats.helmetBreaches + newStats.helmetBreaches,
+                                vestBreaches: stats.vestBreaches + newStats.vestBreaches,
                                 forbiddenZoneEntries: stats.forbiddenZoneEntries + newStats.forbiddenZoneEntries
                             };
                             console.log(`Added ${response.count} new events to stats`);
@@ -148,6 +153,8 @@
                         detectedPersons: 0,
                         detectedVehicles: 0,
                         ppeBreaches: 0,
+                        helmetBreaches: 0,
+                        vestBreaches: 0,
                         forbiddenZoneEntries: 0
                     };
                 }
@@ -339,9 +346,33 @@
             </svg>`}
         />
 
-        <StatCard
+        <StatCardMulti
             title="PPE Compliance Breaches"
-            value={stats.ppeBreaches}
+            items={[
+                {
+                    label: 'Hard Hat',
+                    value: stats.helmetBreaches,
+                    color: 'text-[#E76A23]',
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 3C8 3 5 6 5 9v3h14V9c0-3-3-6-7-6z"/>
+                        <path d="M5 12v2c0 1 1 2 2 2h10c1 0 2-1 2-2v-2H5z"/>
+                        <circle cx="12" cy="8" r="1" fill="currentColor"/>
+                    </svg>`
+                },
+                {
+                    label: 'Safety Vest',
+                    value: stats.vestBreaches,
+                    color: 'text-[#E76A23]',
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3l-3 3v15h14V6l-3-3"/>
+                        <path d="M8 3c0 2 1 3 2 4 1 1 2 1 2 1s1 0 2-1c1-1 2-2 2-4"/>
+                        <line x1="7" y1="10" x2="9" y2="10" stroke-width="3"/>
+                        <line x1="15" y1="10" x2="17" y2="10" stroke-width="3"/>
+                        <line x1="7" y1="14" x2="9" y2="14" stroke-width="3"/>
+                        <line x1="15" y1="14" x2="17" y2="14" stroke-width="3"/>
+                    </svg>`
+                }
+            ]}
             iconColor="text-orange-600"
             icon={`<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
