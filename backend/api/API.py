@@ -1,8 +1,7 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 from typing import List
-import sqlite3
 from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 import cv2
@@ -42,11 +41,7 @@ app.add_middleware(
 @app.get("/events")
 def fetch_events():
     try:
-        sqlconn = sqlite3.connect(db_path)
-        cursor = sqlconn.cursor()
-        cursor.execute("SELECT * FROM events")
-        rows = cursor.fetchall()
-        sqlconn.close()
+        rows = db_manager.get_all_events()
         return rows
     except Exception as e:
         logger.error(f"Failed to fetch events: {e}")
@@ -66,7 +61,8 @@ def take_snapshot():
         # Ensure the snapshot directory exists
         os.makedirs(snapshot_path, exist_ok=True)
 
-        filename = "snapshot.png"
+         # Save with timestamp to avoid conflicts
+        filename = "snapshot_temp.png"
         file_path = os.path.join(snapshot_path, filename)
         cv2.imwrite(file_path, frame)
         return FileResponse(file_path, media_type="image/png")
@@ -101,8 +97,25 @@ def setup_config(config_data: ConfigData):
         location_id = db_manager.get_location_by_name(config_data.locationName)
 
         if location_id is None:
-            # Create new location
-            location_id = db_manager.insert_location(config_data.locationName)
+            # Create new location and set it as active
+            location_id = db_manager.insert_location_and_activate(config_data.locationName)
+        else:
+            # Location exists - delete old zones and set as active
+            db_manager.delete_zones_by_location(location_id)
+            db_manager.set_active_location(location_id)
+
+        # Handle snapshot renaming if temp snapshot exists
+        filename = "snapshot_temp.png"
+        file_path = os.path.join(snapshot_path, filename)
+        if os.path.exists(file_path):
+            new_filename = f"snapshot_location_{location_id}.png"
+            new_file_path = os.path.join(snapshot_path, new_filename)
+            # Remove old snapshot if it exists
+            if os.path.exists(new_file_path):
+                os.remove(new_file_path)
+            os.rename(file_path, new_file_path)
+        else:
+            logger.warning(f"No snapshot found at {file_path} to rename.")
 
         # Insert zones for this location
         zone_count = 0
@@ -154,20 +167,20 @@ def get_zones():
         logger.error(f"Failed to fetch zones: {e}")
         raise
 
-@app.get("/system/start")
+@app.post("/system/start")
 def start_system():
     try:
         db_manager.set_ai_running(True)
-        return {"status": "Ai starting"}
+        return {"status": "AI starting"}
     except Exception as e:
         logger.error(f"Failed to start AI system: {e}")
         return {"status": "error", "message": str(e)}
 
-@app.get("/system/stop")
+@app.post("/system/stop")
 def stop_system():
     try:
         db_manager.set_ai_running(False)
-        return {"status": "Ai stopping"}
+        return {"status": "AI stopping"}
     except Exception as e:
         logger.error(f"Failed to stop AI system: {e}")
         return {"status": "error", "message": str(e)}
@@ -183,22 +196,25 @@ def get_status():
 
 @app.get("/config/current")
 def get_current_config():
+    """
+    Get the currently active configuration.
+    """
     try:
-        location = db_manager.get_latest_location()
+        location = db_manager.get_active_location()
         if not location:
             return {
                 "status": "no_config",
-                "message": "No configuration found"
+                "message": "No active configuration found"
             }
         location_id, location_name = location
         zones = db_manager.get_zones_by_location(location_id)
-
         return {
             "status": "success",
             "config": {
-                "location_id": location_id,
-                "location_name": location_name,
-                "zones": zones
+                "locationId": location_id,
+                "locationName": location_name,
+                "zones": zones,
+                "snapshotPath": f"/snapshot/{location_id}"
             }
         }
     except Exception as e:
@@ -208,20 +224,49 @@ def get_current_config():
             "message": f"Failed to get current configuration: {str(e)}"
         }
 
+@app.delete("/config/current")
+def delete_current_config():
+    """
+    Delete the current (latest) configuration (location and zones).
+    """
+    try:
+        # Get the latest location
+        location = db_manager.get_latest_location()
+        if not location:
+            return {
+                "status": "no_config",
+                "message": "No configuration to delete"
+            }
+
+        location_id = location[0]
+
+        # Delete location and its zones using database manager
+        db_manager.delete_location(location_id)
+
+        # Optionally delete the snapshot file
+        snapshot_file = os.path.join(snapshot_path, f"snapshot_location_{location_id}.png")
+        if os.path.exists(snapshot_file):
+            os.remove(snapshot_file)
+            logger.info(f"Deleted snapshot for location {location_id}")
+
+        return {
+            "status": "success",
+            "message": "Configuration deleted successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to delete config: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
 @app.get("/config/locations")
 def get_all_locations():
     """
     Get all locations with their zone counts.
     """
     try:
-        db_manager.cursor.execute("""
-            SELECT l.location_id, l.name, COUNT(z.zone_id) as zone_count
-            FROM location l
-            LEFT JOIN zones z ON l.location_id = z.location_id
-            GROUP BY l.location_id, l.name
-            ORDER BY l.location_id DESC
-        """)
-        rows = db_manager.cursor.fetchall()
+        rows = db_manager.get_all_locations()
 
         locations = []
         for row in rows:
@@ -248,13 +293,8 @@ def get_config_by_location(location_id: int):
     Get configuration for a specific location.
     """
     try:
-        # Get location info
-        db_manager.cursor.execute("""
-            SELECT location_id, name
-            FROM location
-            WHERE location_id = ?
-        """, (location_id,))
-        location = db_manager.cursor.fetchone()
+        # Get location info using database manager
+        location = db_manager.get_location_by_id(location_id)
 
         if not location:
             return {
@@ -262,22 +302,49 @@ def get_config_by_location(location_id: int):
                 "message": "Location not found"
             }
 
-        location_id, location_name = location
+        loc_id, location_name = location
 
         # Get zones for this location
-        zones = db_manager.get_zones_by_location(location_id)
+        zones = db_manager.get_zones_by_location(loc_id)
 
         return {
             "status": "success",
             "config": {
-                "locationId": location_id,
+                "locationId": loc_id,
                 "locationName": location_name,
                 "zones": zones,
-                "snapshotPath": f"/snapshot?location_id={location_id}"
+                "snapshotPath": f"/snapshot/{loc_id}"
             }
         }
     except Exception as e:
         logger.error(f"Failed to fetch config for location {location_id}: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+@app.post("/config/activate/{location_id}")
+def activate_location(location_id: int):
+    """
+    Set a specific location as the active one.
+    This will be used for monitoring.
+    """
+    try:
+        location = db_manager.get_location_by_id(location_id)
+        if not location:
+            return {
+                "status": "error",
+                "message": "Location not found"
+            }
+
+        db_manager.set_active_location(location_id)
+
+        return {
+            "status": "success",
+            "message": f"Location '{location[1]}' is now active"
+        }
+    except Exception as e:
+        logger.error(f"Failed to activate location: {e}")
         return {
             "status": "error",
             "message": str(e)
@@ -289,13 +356,14 @@ def delete_location_config(location_id: int):
     Delete a specific location and its zones.
     """
     try:
-        # Delete zones for this location
-        db_manager.cursor.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
+        # Delete location and its zones using database manager
+        db_manager.delete_location(location_id)
 
-        # Delete the location
-        db_manager.cursor.execute("DELETE FROM location WHERE location_id = ?", (location_id,))
-
-        db_manager.sqlconn.commit()
+        # Optionally delete the snapshot file
+        snapshot_file = os.path.join(snapshot_path, f"snapshot_location_{location_id}.png")
+        if os.path.exists(snapshot_file):
+            os.remove(snapshot_file)
+            logger.info(f"Deleted snapshot for location {location_id}")
 
         return {
             "status": "success",
@@ -307,3 +375,20 @@ def delete_location_config(location_id: int):
             "status": "error",
             "message": str(e)
         }
+
+@app.get("/snapshot/{location_id}")
+def get_snapshot_by_location(location_id: int):
+    try:
+        file_path = os.path.join(snapshot_path, f"snapshot_location_{location_id}.png")
+        if os.path.exists(file_path):
+            return FileResponse(file_path, media_type="image/png")
+        else:
+            logger.warning(f"Snapshot not found for location {location_id}")
+            return {"error": "Snapshot not found"}
+    except Exception as e:
+        logger.error(f"Error retrieving snapshot: {e}")
+        return {"error": f"Failed to retrieve snapshot: {str(e)}"}
+
+@app.get("/events_time")
+def get_events_time(location_id: int, start_date: str, end_date: str):
+    return db_manager.get_events_by_date(location_id, start_date, end_date)

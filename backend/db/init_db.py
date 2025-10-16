@@ -17,7 +17,7 @@ FOREIGN KEY (zone_id) REFERENCES zones (zone_id),FOREIGN KEY (location_id) REFER
 cursor.execute("""CREATE TABLE IF NOT EXISTS zones (zone_id INTEGER PRIMARY KEY AUTOINCREMENT,location_id INTEGER NOT NULL,coords TEXT NOT NULL,name TEXT NOT NULL,
 FOREIGN KEY (location_id) REFERENCES location (location_id))""")
 cursor.execute("""CREATE TABLE IF NOT EXISTS object (object_id INTEGER PRIMARY KEY ,type TEXT NOT NULL)""")
-cursor.execute("""CREATE TABLE IF NOT EXISTS location (location_id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL)""")
+cursor.execute("""CREATE TABLE IF NOT EXISTS location (location_id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,is_active INTEGER NOT NULL DEFAULT 0 CHECK(is_active IN (0,1)))""")
 cursor.execute("""CREATE TABLE IF NOT EXISTS system_config (system_config_id INTEGER PRIMARY KEY AUTOINCREMENT, ai_running INTEGER NOT NULL DEFAULT 0 CHECK(ai_running IN (0,1)))""")
 cursor.execute("""INSERT INTO system_config (ai_running) VALUES (0);""")
 sqlconn.commit()

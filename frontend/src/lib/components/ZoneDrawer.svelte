@@ -253,7 +253,7 @@
 <div class="flex flex-col">
     {#if !readOnly}
         <!-- Control Panel -->
-        <div class="bg-white border border-gray-100 rounded-md p-3 mb-3 shadow-sm">
+        <div class="bg-white border border-gray-100 p-3 mb-3 shadow-sm">
             <!-- Top Row: Zone visibility and drawing controls -->
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
@@ -344,7 +344,7 @@
     {/if}
 
     <!-- Canvas Container -->
-    <div bind:this={container} class="relative w-full h-auto rounded-lg overflow-hidden shadow-lg ring-1 ring-gray-200" style="aspect-ratio: {imageAspectRatio}; max-width: 100%;">
+    <div bind:this={container} class="relative w-full h-auto overflow-hidden" style="aspect-ratio: {imageAspectRatio}; max-width: 100%;">
         <img src={imageSrc} alt="Snapshot" class="absolute inset-0 w-full h-full object-fill pointer-events-none select-none" draggable="false" style="z-index:1;" />
 
         {#if readOnly}

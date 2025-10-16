@@ -11,14 +11,14 @@ class DatabaseManager:
 
 
     def insert_object(self,object_id,object_type):
-
         self.cursor.execute("""INSERT INTO object (object_id,type) VALUES (?,?)""", (object_id,object_type))
+        self.sqlconn.commit()
 
     def insert_events(self,object_id,zone_id,location_id,has_helmet,has_vest,time):
         self.cursor.execute("""INSERT INTO events (object_id,zone_id,location_id,has_helmet,has_vest,time)
         VALUES (?,?,?,?,?,?)""",
         (object_id,zone_id,location_id,has_helmet,has_vest,time))
-
+        self.sqlconn.commit()
 
     def get_event(self):
         self.cursor.execute("SELECT * from events")
@@ -29,6 +29,7 @@ class DatabaseManager:
     def insert_zone(self, points,name,location_id):
         coords_json = json.dumps(points)
         self.cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json,name,location_id))
+        self.sqlconn.commit()
 
     def fetch_all_zones(self):
         self.cursor.execute("SELECT * from zones")
@@ -42,6 +43,7 @@ class DatabaseManager:
 
     def set_ai_running(self,value: bool):
         self.cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0,))
+        self.sqlconn.commit()
 
     def get_ai_running(self) -> bool:
         self.cursor.execute("SELECT ai_running FROM system_config WHERE system_config_id=1")
@@ -61,9 +63,29 @@ class DatabaseManager:
         self.cursor.execute("SELECT location_id, name FROM location ORDER BY location_id DESC LIMIT 1")
         return self.cursor.fetchone()
 
+    def get_active_location(self):
+        """Get the currently active location."""
+        cursor = self.sqlconn.cursor()
+        cursor.execute("SELECT location_id, name FROM location WHERE is_active = 1 LIMIT 1")
+        result = cursor.fetchone()
+        cursor.close()
+        return result
+
+    def set_active_location(self, location_id):
+        """Set a location as active (and deactivate all others)."""
+        # Deactivate all locations
+        self.cursor.execute("UPDATE location SET is_active = 0")
+        # Activate the specified location
+        self.cursor.execute("UPDATE location SET is_active = 1 WHERE location_id = ?", (location_id,))
+        self.sqlconn.commit()
+
     def get_zones_by_location(self, location_id):
-        self.cursor.execute("SELECT * FROM zones WHERE location_id=?", (location_id,))
-        rows = self.cursor.fetchall()
+        # Use a separate cursor to avoid recursive cursor issues
+        cursor = self.sqlconn.cursor()
+        cursor.execute("SELECT * FROM zones WHERE location_id=?", (location_id,))
+        rows = cursor.fetchall()
+        cursor.close()
+
         zones = []
         for row in rows:
             zone_id, loc_id, coords_json, name = row
@@ -72,8 +94,10 @@ class DatabaseManager:
         return zones
 
     def get_location_by_name(self, name):
-        self.cursor.execute("SELECT location_id FROM location WHERE name=?", (name,))
-        result = self.cursor.fetchone()
+        cursor = self.sqlconn.cursor()
+        cursor.execute("SELECT location_id FROM location WHERE name=?", (name,))
+        result = cursor.fetchone()
+        cursor.close()
         if result:
             return result[0]
         return None
@@ -82,3 +106,69 @@ class DatabaseManager:
         self.cursor.execute("INSERT INTO location (name) VALUES (?)", (name,))
         self.sqlconn.commit()
         return self.cursor.lastrowid
+
+    def insert_location_and_activate(self, name):
+        """Insert a new location and set it as active."""
+        # Deactivate all other locations first
+        self.cursor.execute("UPDATE location SET is_active = 0")
+        # Insert new location as active
+        self.cursor.execute("INSERT INTO location (name, is_active) VALUES (?, 1)", (name,))
+        self.sqlconn.commit()
+        return self.cursor.lastrowid
+
+    def delete_zones_by_location(self, location_id):
+        """Delete all zones for a specific location."""
+        self.cursor.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
+        self.sqlconn.commit()
+
+    def get_all_locations(self):
+        # Use a separate cursor to avoid recursive cursor issues
+        cursor = self.sqlconn.cursor()
+        cursor.execute("""
+        SELECT l.location_id, l.name, COUNT(z.zone_id) as zone_count
+        FROM location l
+        LEFT JOIN zones z ON l.location_id = z.location_id
+        GROUP BY l.location_id, l.name
+        ORDER BY l.location_id DESC
+    """)
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows
+
+    def get_location_by_id(self, location_id):
+        """Get location by ID."""
+        cursor = self.sqlconn.cursor()
+        cursor.execute("""
+            SELECT location_id, name
+            FROM location
+            WHERE location_id = ?
+        """, (location_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        return result
+
+    def delete_location(self, location_id):
+        """Delete a location and all its zones."""
+        # Delete zones first (foreign key constraint)
+        self.cursor.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
+        # Delete the location
+        self.cursor.execute("DELETE FROM location WHERE location_id = ?", (location_id,))
+        self.sqlconn.commit()
+
+    def get_all_events(self):
+        """Get all events from the database."""
+        self.cursor.execute("SELECT * FROM events")
+        return self.cursor.fetchall()
+
+    def get_events_by_date(self, location_id: int, start_date: str, end_date: str):
+        query = """ SELECT * FROM events WHERE location_id = ? AND DATE(time) BETWEEN ? AND ? ORDER BY time"""
+
+        self.cursor.execute(query,(location_id,start_date,end_date))
+        rows = self.cursor.fetchall()
+        columns = [desc[0] for desc in self.cursor.description]
+        results = [dict(zip(columns,rows)) for rows in rows]
+        return results
+
+    def __del__(self):
+        if hasattr(self, "sqlconn"):
+            self.sqlconn.close()
