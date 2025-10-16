@@ -173,25 +173,28 @@ class DeviceRuntime:
 
 
     def _update_config(self):
-
-        self.db_queue.put({"action": "get_location_id", "response": self.response_queue})
+        response_queue = queue.Queue()
+        self.db_queue.put({"action": "get_location_id", "response": response_queue})
         try:
-            location_id = self.response_queue.get(timeout=0.1)
+            location_id = response_queue.get(timeout=0.1)
             self.event_manager.set_location(location_id)
         except queue.Empty:
             print("No location ID fetched.")
 
-        self.db_queue.put({"action": "get_zones", "location_id": location_id, "response": self.response_queue})
+        response_queue = queue.Queue()
+        self.db_queue.put({"action": "get_zones", "response": response_queue})
         try:
-            zones = self.response_queue.get(timeout=0.1)
+            zones = response_queue.get(timeout=0.1)
             print(f"Fetched {len(zones)} zones from database.")
             self.event_manager.set_zones(zones, self.frame_width, self.frame_height)
 
         except queue.Empty:
             print("No zones fetched.")
-        self.db_queue.put({"action": "get_latest_object_id", "response": self.response_queue})
+
+        response_queue = queue.Queue()
+        self.db_queue.put({"action": "get_latest_object_id", "response": response_queue})
         try:
-            last_object_id = self.response_queue.get(timeout=0.1)
+            last_object_id = response_queue.get(timeout=0.1)
             self.tracker.set_track_id(last_object_id)
 
         except queue.Empty:
