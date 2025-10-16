@@ -26,13 +26,14 @@ class DeviceRuntime:
         self.frame_width = None
         self.frame_height = None
         self._initialize_components()
+        self.warmup_counter = 0
 
 
 
     def _initialize_components(self):
         self._load_model()
 
-        self.class_names = load_class_mapping("device/training/dataset/safety_dataset_filtered.yaml")
+        self.class_names = load_class_mapping("device/training/dataset/yolo11_person_only.yaml")
         ppe_names = load_class_mapping("device/training/dataset/safety-dataset_ppe_only.yaml")
 
         self.cam = cv2.VideoCapture(0)
@@ -65,10 +66,18 @@ class DeviceRuntime:
                     time.sleep(1)
                     continue
 
+                if self.warmup_counter < 10:
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    detections = run_inference(rgb_frame, self.model)
+                    self.event_manager.warmup(frame)
+                    self.warmup_counter += 1
+                    if self.warmup_counter >= 10:
+                        print("Model warmup complete!")
+                    continue
+
                 # Process frame
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 detections = run_inference(rgb_frame, self.model)
-
                 # Filter detections by class
                 trackable_classes = ["Person", "vehicle"]
                 # trackable_classes = ["Hardhat", "Safety Vest", "NO-Hardhat", "NO-Safety Vest"]
@@ -123,7 +132,7 @@ class DeviceRuntime:
 
     def _load_model(self):
         model_config = "device/training/models/yolo11_ppe_cfg.yaml"
-        model_path = "device/training/models/yolo11_ppe_v5.pt"
+        model_path = "device/training/models/yolo11_person_only.pt"
 
         try:
             self.model = YOLO(model_path)
@@ -169,7 +178,7 @@ class DeviceRuntime:
         self.db_queue.put({"action": "get_latest_object_id", "response": self.response_queue})
         try:
             last_object_id = self.response_queue.get(timeout=0.1)
-
+            self.tracker.set_track_id(last_object_id)
 
         except queue.Empty:
             print("No objects fetched.")

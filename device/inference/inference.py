@@ -6,7 +6,7 @@ logger = get_logger("Inference")
 
 def run_inference(frame, model):
     try:
-        results = model.predict(frame, verbose=False, conf=0.5, iou=0.6)
+        results = model.predict(frame, verbose=False, conf=0.5, iou=0.5)
         res = results[0]
 
         detections = []

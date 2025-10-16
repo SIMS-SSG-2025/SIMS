@@ -188,3 +188,8 @@ class EventManager:
             coords = zone["coords"]
             zone_coords.append(coords)
         return zone_coords
+
+    def warmup(self, frame):
+        _ = run_inference(frame, self.ppe_detector)
+
+
