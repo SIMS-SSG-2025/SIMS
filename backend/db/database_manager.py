@@ -40,8 +40,8 @@ class DatabaseManager:
         self.cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json,name,location_id))
         self.sqlconn.commit()
 
-    def fetch_all_zones(self):
-        self.cursor.execute("SELECT * from zones")
+    def fetch_all_zones(self, location_id):
+        self.cursor.execute("SELECT * from zones WHERE location_id=?", (location_id,))
         rows = self.cursor.fetchall()
         zones = []
         for row in rows:
@@ -122,7 +122,7 @@ class DatabaseManager:
             VALUES (?, ?, ?, ?, ?)
         """, data)
         self.sqlconn.commit()
-        
+
     def insert_location_and_activate(self, name):
         """Insert a new location and set it as active."""
         # Deactivate all other locations first

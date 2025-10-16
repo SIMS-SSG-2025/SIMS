@@ -173,7 +173,15 @@ class DeviceRuntime:
 
 
     def _update_config(self):
-        self.db_queue.put({"action": "get_zones", "response": self.response_queue})
+
+        self.db_queue.put({"action": "get_location_id", "response": self.response_queue})
+        try:
+            location_id = self.response_queue.get(timeout=0.1)
+            self.event_manager.set_location(location_id)
+        except queue.Empty:
+            print("No location ID fetched.")
+
+        self.db_queue.put({"action": "get_zones", "location_id": location_id, "response": self.response_queue})
         try:
             zones = self.response_queue.get(timeout=0.1)
             print(f"Fetched {len(zones)} zones from database.")
@@ -189,12 +197,7 @@ class DeviceRuntime:
         except queue.Empty:
             print("No objects fetched.")
 
-        self.db_queue.put({"action": "get_location_id", "response": self.response_queue})
-        try:
-            location_id = self.response_queue.get(timeout=0.1)
-            self.event_manager.set_location(location_id)
-        except queue.Empty:
-            print("No location ID fetched.")
+
 
     """
     # Update the configuration if needed

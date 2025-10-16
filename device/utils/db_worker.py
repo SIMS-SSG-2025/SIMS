@@ -34,7 +34,8 @@ def db_worker(db_queue, stop_event, db_path="backend/db/events.db"):
         elif msg["action"] == "set_status":
             db_manager.set_ai_running(msg["status"])
         elif msg["action"] == "get_zones":
-            zones = db_manager.fetch_all_zones()
+            location_id = msg["location_id"]
+            zones = db_manager.fetch_all_zones(location_id)
             if "response" in msg:
                 msg["response"].put(zones)
 
