@@ -26,6 +26,8 @@ class DeviceRuntime:
         self.frame_width = None
         self.frame_height = None
         self._initialize_components()
+        self.frame_count = 0
+        self.FRAME_SAMPLE = 3
         self.warmup_counter = 0
 
 
@@ -65,6 +67,7 @@ class DeviceRuntime:
                     self.logger.warning("Failed to capture frame from camera")
                     time.sleep(1)
                     continue
+                self.frame_count += 1
 
                 if self.warmup_counter < 10:
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -88,7 +91,13 @@ class DeviceRuntime:
 
                 # Update tracking and handle events
                 tracked_objects, in_frame_objects = self.tracker.update(results, frame)
-                self.event_manager.handle_detections(tracked_objects, frame)
+
+                if self.frame_count % self.FRAME_SAMPLE == 0:
+                    self.event_manager.handle_detections(tracked_objects, rgb_frame, store_obj_pos=True)
+                    self.frame_count = 0
+                else:
+                    self.event_manager.handle_detections(tracked_objects, rgb_frame, store_obj_pos=False)
+
 
                 # Calculate and display FPS
                 current_time = time.time()
