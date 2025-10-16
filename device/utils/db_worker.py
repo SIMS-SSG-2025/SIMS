@@ -51,6 +51,11 @@ def db_worker(db_queue, stop_event, db_path="backend/db/events.db"):
             if "response" in msg:
                 msg["response"].put(location_id)
 
+        elif msg["action"] == "get_latest_object_id":
+            last_object_id = db_manager.get_latest_object_id()
+            if "response" in msg:
+                msg["response"].put(last_object_id)
+
 
 
     print("DB thread exited.")
