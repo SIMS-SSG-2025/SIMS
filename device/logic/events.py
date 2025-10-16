@@ -1,14 +1,13 @@
 import os
 from backend.db.database_manager import DatabaseManager
 import datetime
-
+from ultralytics import YOLO
 from shapely.geometry import Point, Polygon
-
 from ..utils.logger import get_logger
-
+from device.inference.inference import run_inference
 
 class EventManager:
-    def __init__(self, logger, db_queue, class_names):
+    def __init__(self, logger, db_queue, class_names, ppe_names):
         self.active_tracks = set()
         self.tracked_objects_info = {}
         self.in_zone_objects = set()
@@ -20,8 +19,10 @@ class EventManager:
         self.logger = logger
         self.detection_logger = get_logger("DETECTION")
         self.class_names = class_names
+        self.ppe_names = ppe_names
+        self.ppe_detector = YOLO('device/training/models/yolo11_ppe_only_v2.pt')
 
-    def handle_detections(self, tracked_objects, ppe_detections):
+    def handle_detections(self, tracked_objects, frame):
         """
         Handles detections.
         Creates or updates events in DB as needed.
@@ -37,11 +38,12 @@ class EventManager:
             if track_id not in self.active_tracks:
                 # New object detected
                 self.active_tracks.add(track_id)
+                ppe_detections = run_inference(frame, self.ppe_detector)
                 if obj["class"] == "Person":
                     obj["ppe"] = []
                     for ppe in ppe_detections:
                         if self._is_ppe_on_person(obj["bbox"], ppe[0]):
-                            obj["ppe"].append(self.class_names[ppe[2]])
+                            obj["ppe"].append(self.ppe_names[ppe[2]])
                         #if self._is_overlapping(obj["bbox"], ppe[0]):
                         #    obj["ppe"].append(self.class_names[ppe[2]])
                     self.tracked_objects_info[track_id] = obj["ppe"]
@@ -187,6 +189,10 @@ class EventManager:
             coords = zone["coords"]
             zone_coords.append(coords)
         return zone_coords
+
+    def warmup(self, frame):
+        _ = run_inference(frame, self.ppe_detector)
+
 
     def set_location(self, location_id):
         self.location = location_id

@@ -26,13 +26,15 @@ class DeviceRuntime:
         self.frame_width = None
         self.frame_height = None
         self._initialize_components()
+        self.warmup_counter = 0
 
 
 
     def _initialize_components(self):
         self._load_model()
 
-        self.class_names = load_class_mapping("device/training/dataset/safety_dataset_filtered_v2.yaml")
+        self.class_names = load_class_mapping("device/training/dataset/yolo11_person_only.yaml")
+        ppe_names = load_class_mapping("device/training/dataset/safety-dataset_ppe_only.yaml")
 
         self.cam = cv2.VideoCapture(0)
         if not self.cam.isOpened():
@@ -47,7 +49,7 @@ class DeviceRuntime:
 
         self.tracker = Tracker(class_names=self.class_names, cam_fps=cam_fps)
         inference_logger = get_logger("Inference")
-        self.event_manager = EventManager(logger=inference_logger, db_queue=self.db_queue, class_names=self.class_names)
+        self.event_manager = EventManager(logger=inference_logger, db_queue=self.db_queue, class_names=self.class_names, ppe_names=ppe_names)
 
     def start(self):
         self.running = True
@@ -64,12 +66,21 @@ class DeviceRuntime:
                     time.sleep(1)
                     continue
 
+                if self.warmup_counter < 10:
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    detections = run_inference(rgb_frame, self.model)
+                    self.event_manager.warmup(frame)
+                    self.warmup_counter += 1
+                    if self.warmup_counter >= 10:
+                        print("Model warmup complete!")
+                    continue
+
                 # Process frame
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 detections = run_inference(rgb_frame, self.model)
-
                 # Filter detections by class
                 trackable_classes = ["Person", "vehicle"]
+                # trackable_classes = ["Hardhat", "Safety Vest", "NO-Hardhat", "NO-Safety Vest"]
                 ppe_classes = ["Hardhat", "Safety Vest",]
                 detections_for_tracking = [d for d in detections if self.class_names[d[-1]] in trackable_classes]
                 results = DetectionResults(detections_for_tracking)
@@ -77,7 +88,7 @@ class DeviceRuntime:
 
                 # Update tracking and handle events
                 tracked_objects, in_frame_objects = self.tracker.update(results, frame)
-                self.event_manager.handle_detections(tracked_objects, ppe_detections)
+                self.event_manager.handle_detections(tracked_objects, frame)
 
                 # Calculate and display FPS
                 current_time = time.time()
@@ -121,21 +132,12 @@ class DeviceRuntime:
 
     def _load_model(self):
         model_config = "device/training/models/yolo11_ppe_cfg.yaml"
-        model_path = "device/training/models/yolo11_ppe_v4.pt"
+        model_path = "device/training/models/yolo11_person_only.pt"
 
         try:
-            with open(model_config, 'r') as file:
-                model_config = yaml.safe_load(file)
+            self.model = YOLO(model_path)
 
-            yolo_model = torch.load(model_path, map_location='cpu')
-            model_config = yolo_model['model'].yaml
-            num_classes = model_config["nc"]
-            self.model = DetectionModel(cfg=model_config, nc=num_classes)
-            self.model.load_state_dict(yolo_model['model'].state_dict())
 
-            # self.model = DetectionModel(cfg=model_config, nc=num_classes)
-            # self.model.load_state_dict(torch.load(model_path, map_location=lambda storage, loc: storage))
-            self.model.eval()
 
         except Exception as e:
             self.logger.error(f"Failed to load model: {e}")
@@ -176,6 +178,8 @@ class DeviceRuntime:
         self.db_queue.put({"action": "get_latest_object_id", "response": self.response_queue})
         try:
             last_object_id = self.response_queue.get(timeout=0.1)
+            self.tracker.set_track_id(last_object_id)
+
         except queue.Empty:
             print("No objects fetched.")
 
