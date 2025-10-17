@@ -4,7 +4,7 @@ import datetime
 from ultralytics import YOLO
 from shapely.geometry import Point, Polygon
 from ..utils.logger import get_logger
-from device.inference.inference import run_inference
+from device.inference.inference import run_inference, run_inference_roi
 
 class EventManager:
     def __init__(self, logger, db_queue, class_names, ppe_names):
@@ -39,7 +39,8 @@ class EventManager:
             if track_id not in self.active_tracks:
                 # New object detected
                 self.active_tracks.add(track_id)
-                ppe_detections = run_inference(frame, self.ppe_detector)
+                # ppe_detections = run_inference(frame, self.ppe_detector)
+                ppe_detections = run_inference_roi(frame, obj["bbox"], self.ppe_detector)
                 if obj["class"] == "Person":
                     obj["ppe"] = []
                     for ppe in ppe_detections:
