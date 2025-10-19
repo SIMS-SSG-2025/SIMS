@@ -7,6 +7,7 @@
     import StatCard from "$lib/components/StatCard.svelte";
     import StatCardMulti from "$lib/components/StatCardMulti.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
+    import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
     import { onMount } from "svelte";
     import { fetchCurrentConfig, type Config } from "$lib/api/config";
     import {
@@ -55,6 +56,19 @@
         missingVest: 0,
         missingBoth: 0
     });
+
+    // Normalize zones for ZoneDrawer (convert absolute coordinates to 0-1 range if needed)
+    function normalizeZones(zones: any[], imageWidth: number, imageHeight: number) {
+        if (!zones || zones.length === 0) return [];
+
+        return zones.map(zone => ({
+            ...zone,
+            points: zone.points.map((p: any) => ({
+                x: p.x > 1 ? p.x / imageWidth : p.x,
+                y: p.y > 1 ? p.y / imageHeight : p.y
+            }))
+        }));
+    }
 
     let lastFetchTime = $state<Date | null>(null);
     let pollingInterval: any;
@@ -350,7 +364,7 @@
             title="PPE Compliance Breaches"
             items={[
                 {
-                    label: 'Hard Hat',
+                    label: 'Missing Hard Hat',
                     value: stats.helmetBreaches,
                     color: 'text-[#E76A23]',
                     icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -360,7 +374,7 @@
                     </svg>`
                 },
                 {
-                    label: 'Safety Vest',
+                    label: 'Missing Safety Vest',
                     value: stats.vestBreaches,
                     color: 'text-[#E76A23]',
                     icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -443,7 +457,7 @@
         </div>
     {:else if activeTab === 'area'}
         <!-- Area Management Content -->
-        <div class="px-8 py-8 max-w-7xl mx-auto">
+        <div class="px-8 max-w-7xl mx-auto">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">Area Management</h2>
                 <button
@@ -461,45 +475,26 @@
             <!-- Snapshot with Zones -->
             <div class="bg-white rounded-2xl shadow p-6">
                 <h3 class="text-lg font-semibold text-gray-700 mb-4">Camera View with Zones</h3>
-                <div class="relative bg-gray-100 rounded-lg overflow-hidden" style="min-height: 600px;">
+                <div class="p-6 flex items-center justify-center bg-gray-100 rounded-lg overflow-hidden" style="height: 600px;">
                     {#if config && config.snapshotPath}
-                        <img
-                            src={config.snapshotPath}
-                            alt="Camera snapshot"
-                            class="w-full h-auto"
-                        />
-                        <!-- Zone overlays -->
-                        {#if config.zones && config.zones.length > 0}
-                            <svg class="absolute top-0 left-0 w-full h-full pointer-events-none">
-                                {#each config.zones as zone, i}
-                                    <polygon
-                                        points={zone.points.map((p: any) => `${p.x},${p.y}`).join(' ')}
-                                        fill={i % 2 === 0 ? 'rgba(231, 106, 35, 0.3)' : 'rgba(239, 68, 68, 0.3)'}
-                                        stroke={i % 2 === 0 ? 'rgb(231, 106, 35)' : 'rgb(239, 68, 68)'}
-                                        stroke-width="2"
-                                    />
-                                    <text
-                                        x={zone.points[0].x}
-                                        y={zone.points[0].y - 5}
-                                        fill={i % 2 === 0 ? 'rgb(231, 106, 35)' : 'rgb(239, 68, 68)'}
-                                        font-size="14"
-                                        font-weight="bold"
-                                    >
-                                        {zone.name}
-                                    </text>
-                                {/each}
-                            </svg>
-                        {/if}
+                        <div class="w-full max-w-2xl max-h-full">
+                            <ZoneDrawer
+                                zones={normalizeZones(config.zones || [], 1920, 1080)}
+                                imageSrc={config.snapshotPath}
+                                width={1200}
+                                height={675}
+                                readOnly={true}
+                                onFinishZone={() => {}}
+                            />
+                        </div>
                     {:else}
-                        <div class="flex items-center justify-center h-full min-h-[600px]">
-                            <div class="text-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                <p class="text-gray-500 text-lg">No snapshot available</p>
-                                <p class="text-gray-400 text-sm mt-2">Configure camera settings to capture a snapshot</p>
-                            </div>
+                        <div class="text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <p class="text-gray-500 text-lg font-medium mb-2">No snapshot available</p>
+                            <p class="text-gray-400 text-sm">Configure camera settings to capture a snapshot</p>
                         </div>
                     {/if}
                 </div>

@@ -351,15 +351,34 @@
             <!-- SVG overlay for read-only mode -->
             <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index:2;" viewBox="0 0 100 100" preserveAspectRatio="none">
                 {#if showZones && zones && zones.length > 0}
-                    {#each zones as zone}
+                    {#each zones as zone, i}
                         {#if zone.points.length >= 3}
                             <polygon
                                 points={zone.points.map(p => `${p.x * 100},${p.y * 100}`).join(' ')}
-                                fill="rgba(255, 30, 0, 0.3)"
-                                stroke="rgba(255, 0, 0, 0.7)"
+                                fill="rgba(231, 106, 35, 0.3)"
+                                stroke="#E76A23"
                                 stroke-width="0.4"
                                 vector-effect="non-scaling-stroke"
                             />
+                            <!-- Zone name label -->
+                            {#if zone.name}
+                                {@const centerX = zone.points.reduce((sum, p) => sum + p.x, 0) / zone.points.length * 100}
+                                {@const centerY = zone.points.reduce((sum, p) => sum + p.y, 0) / zone.points.length * 100}
+
+                                <!-- Zone name text - centered in zone -->
+                                <text
+                                    x={centerX}
+                                    y={centerY}
+                                    text-anchor="middle"
+                                    dominant-baseline="middle"
+                                    fill="#E76A23"
+                                    font-size="2"
+                                    font-weight="700"
+                                    letter-spacing="0.05"
+                                >
+                                    {zone.name}
+                                </text>
+                            {/if}
                         {/if}
                     {/each}
                 {/if}
