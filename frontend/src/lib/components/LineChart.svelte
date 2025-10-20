@@ -22,9 +22,15 @@
     ]
   };
 
+  export let animate = false;  // Control whether to animate updates
+
   export let options = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: {
+      duration: 750,  // Smooth animation duration in milliseconds
+      easing: 'easeInOutQuart'
+    },
     plugins: {
       legend: { position: "top" as const },
       title: { display: true, text: "Line Chart (Placeholder)" }
@@ -64,7 +70,8 @@
   $: if (chart) {
     chart.data = data;
     chart.options = options;
-    chart.update();
+    // Use animation based on the animate prop
+    chart.update(animate ? 'active' : 'none');
   }
 </script>
 

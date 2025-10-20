@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { Eye, EyeOff, Undo, Check, X } from 'lucide-svelte';
+
     export let onFinishZone: (points: { x: number; y: number }[], name: string) => void;
     export let width: number = 640;
     export let height: number = 360;
@@ -261,10 +263,13 @@
                         class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-colors"
                         on:click={toggleZones}
                     >
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={showZones ? "M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" : "M12 6v6m0 0v6m0-6h6m-6 0H6"}></path>
-                        </svg>
-                        {showZones ? "Hide" : "Show"}
+                        {#if showZones}
+                            <EyeOff class="w-3 h-3 mr-1" />
+                            Hide
+                        {:else}
+                            <Eye class="w-3 h-3 mr-1" />
+                            Show
+                        {/if}
                     </button>
                     <span class="text-xs text-gray-500">
                         {zones.length} zone{zones.length !== 1 ? 's' : ''}
@@ -279,9 +284,7 @@
                         aria-label="Undo last point"
                         type="button"
                     >
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
-                        </svg>
+                        <Undo class="w-3 h-3 mr-1" />
                         Undo
                     </button>
                     <button
@@ -291,9 +294,7 @@
                         aria-label="Finish zone"
                         type="button"
                     >
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+                        <Check class="w-3 h-3 mr-1" />
                         Finish
                     </button>
                 </div>
@@ -331,9 +332,7 @@
                                     title="Remove zone"
                                     on:click={() => removeZone(i)}
                                 >
-                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
+                                    <X class="w-2.5 h-2.5" />
                                 </button>
                             </div>
                         {/each}

@@ -1,5 +1,7 @@
 
 <script lang="ts">
+		import { X } from 'lucide-svelte';
+
 		export let open: boolean = false;
 		export let onClose: () => void = () => {};
 		export let modalClass: string = "";
@@ -23,9 +25,7 @@
 				on:click={onClose}
 				aria-label="Close"
 			>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-				</svg>
+				<X class="h-6 w-6" />
 			</button>
 			<slot />
 		</div>

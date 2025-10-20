@@ -3,9 +3,21 @@
     import { Chart, Title, Tooltip, Legend, BarElement, LineElement, PointElement, CategoryScale, LinearScale, BarController, LineController } from 'chart.js';
     import { X } from 'lucide-svelte';
     import type { TimeRangeOption, TimeRange } from '$lib/api/stats';
-    import { calculateTimeRange, getMockChartModalData } from '$lib/api/stats';
+    import {
+        calculateTimeRange,
+        getMockChartModalData,
+        fetchEventsForLocation,
+        createChartDataFromEvents,
+        calculatePPEComplianceFromEvents
+    } from '$lib/api/stats';
     import { chartPreferences } from '$lib/stores/chartPreferences';
     import DateRangePicker from './DateRangePicker.svelte';
+
+    // ============================================
+    // DATA SOURCE CONFIGURATION
+    // ============================================
+    // Set this to false to use mock data for charts
+    const USE_REAL_DATA = true;
 
     Chart.register(
         Title, Tooltip, Legend,
@@ -103,18 +115,71 @@
                 end: new Date(timeRange.end)
             };
 
-            // Use mock data
-            const mockData = getMockChartModalData(plainTimeRange);
+            if (USE_REAL_DATA && locationId) {
+                // ============================================
+                // REAL DATA FROM API
+                // ============================================
+                const eventsResponse = await fetchEventsForLocation(locationId, plainTimeRange);
+                const events = eventsResponse.events;
 
+                // Transform events into chart data
+                const chartData = createChartDataFromEvents(events, plainTimeRange);
+
+                // Convert ChartDataPoint[] to labels and data arrays
+                const hoursDiff = Math.floor((plainTimeRange.end.getTime() - plainTimeRange.start.getTime()) / (1000 * 60 * 60));
+
+                chartLabels = chartData.persons.map(point => {
+                    const date = new Date(point.timestamp);
+
+                    if (hoursDiff <= 24) {
+                        // Day view - show hours
+                        return `${date.getHours()}:00`;
+                    } else if (hoursDiff <= 168) {
+                        // Week view - show day names with date
+                        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    } else if (hoursDiff <= 720) {
+                        // Month view - show dates
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    } else {
+                        // All time - show weeks
+                        const weekNumber = Math.floor((date.getTime() - plainTimeRange.start.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
+                        return `Week ${weekNumber}`;
+                    }
+                });
+
+                personsData = [...chartData.persons.map(point => point.value)];
+                vehiclesData = [...chartData.vehicles.map(point => point.value)];
+                ppeBreachesData = [...chartData.ppeBreaches.map(point => point.value)];
+                zoneEntriesData = [...chartData.zoneEntries.map(point => point.value)];
+            } else {
+                // ============================================
+                // MOCK DATA (Fallback or when USE_REAL_DATA = false)
+                // ============================================
+                const mockData = getMockChartModalData(plainTimeRange);
+
+                chartLabels = [...mockData.labels];
+                personsData = [...mockData.persons];
+                vehiclesData = [...mockData.vehicles];
+                ppeBreachesData = [...mockData.ppeBreaches];
+                zoneEntriesData = [...mockData.zoneEntries];
+            }
+
+            updateChart();
+        } catch (error) {
+            console.error('Error loading chart data:', error);
+            // Fallback to mock data on error
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
+            const plainTimeRange = {
+                start: new Date(timeRange.start),
+                end: new Date(timeRange.end)
+            };
+            const mockData = getMockChartModalData(plainTimeRange);
             chartLabels = [...mockData.labels];
             personsData = [...mockData.persons];
             vehiclesData = [...mockData.vehicles];
             ppeBreachesData = [...mockData.ppeBreaches];
             zoneEntriesData = [...mockData.zoneEntries];
-
             updateChart();
-        } catch (error) {
-            console.error('Error loading chart data:', error);
         } finally {
             loading = false;
         }

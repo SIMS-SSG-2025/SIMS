@@ -397,6 +397,8 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
     // Track unique objects to avoid counting duplicates
     const uniquePersons = new Set<number>();
     const uniqueVehicles = new Set<number>();
+    // Track unique persons with PPE breaches (one breach per person, regardless of what's missing)
+    const uniquePPEBreaches = new Set<number>();
 
     events.forEach(event => {
         // Assuming object_id differentiates between persons and vehicles
@@ -406,8 +408,9 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
         uniquePersons.add(event.object_id);
 
         // Check for PPE breaches (missing helmet or vest)
+        // Only count once per unique person (object_id)
         if (!event.has_helmet || !event.has_vest) {
-            ppeBreaches++;
+            uniquePPEBreaches.add(event.object_id);
         }
 
         // Count helmet breaches specifically
@@ -429,6 +432,7 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
 
     detectedPersons = uniquePersons.size;
     detectedVehicles = uniqueVehicles.size;
+    ppeBreaches = uniquePPEBreaches.size; // Count unique persons with breaches
 
     return {
         detectedPersons,

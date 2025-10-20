@@ -1,6 +1,7 @@
 <script lang="ts">
     import Modal from "./modal.svelte";
     import ZoneDrawer from "./ZoneDrawer.svelte";
+    import { Check, ChevronRight, Camera, Loader2, MapPin, Eye, Trash2, Plus, ArrowLeft, Save, X, Edit, Image, Info, Map } from 'lucide-svelte';
     import {
         fetchCurrentConfig,
         fetchAllLocations,
@@ -317,9 +318,7 @@
                             disabled={step.id > 1 && !canProceedStep1 || step.id > 2 && !canProceedStep2}
                         >
                             {#if currentStep > step.id}
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                </svg>
+                                <Check class="w-4 h-4" />
                             {:else}
                                 {step.id}
                             {/if}
@@ -424,9 +423,7 @@
                             class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors group"
                         >
                             <div class="flex items-center justify-center gap-2">
-                                <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                </svg>
+                                <Plus class="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
                                 <span class="text-sm font-medium text-gray-600 group-hover:text-blue-600">Create New Location</span>
                             </div>
                         </button>
@@ -443,9 +440,7 @@
                                 on:click={backToList}
                                 class="mb-4 px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
                             >
-                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                                </svg>
+                                <ArrowLeft class="w-4 h-4 inline mr-1" />
                                 Back to List
                             </button>
 
@@ -491,14 +486,10 @@
                                     class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {#if startingSystem}
-                                        <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                        </svg>
+                                        <Loader2 class="w-5 h-5 animate-spin" />
                                         {systemStatusMessage || 'Activating...'}
                                     {:else}
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                        </svg>
+                                        <Check class="w-5 h-5" />
                                         Set as Active
                                     {/if}
                                 </button>
@@ -516,9 +507,7 @@
                                 on:click={() => removeSelectedLocation(selectedLocationId!)}
                                 class="w-full px-4 py-3 border border-red-300 bg-white text-red-700 rounded-lg hover:bg-red-50 transition font-medium flex items-center justify-center gap-2"
                             >
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
+                                <Trash2 class="w-5 h-5" />
                                 Delete
                             </button>
                         </div>
@@ -539,9 +528,7 @@
                             </div>
                         {:else}
                             <div class="text-center">
-                                <svg class="w-20 h-20 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
+                                <Camera class="w-20 h-20 text-gray-300 mx-auto mb-4" />
                                 <h3 class="text-lg font-medium text-gray-900 mb-2">No Snapshot Available</h3>
                                 <p class="text-sm text-gray-600">This location doesn't have a snapshot saved.</p>
                             </div>
@@ -627,9 +614,7 @@
                                 class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors group"
                             >
                                 <div class="flex items-center justify-center gap-2">
-                                    <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                    </svg>
+                                    <Plus class="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
                                     <span class="text-sm font-medium text-gray-600 group-hover:text-blue-600">Create New Location</span>
                                 </div>
                             </button>
@@ -652,9 +637,7 @@
                                 </div>
                                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <div class="flex">
-                                        <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
+                                        <Info class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                                         <div class="ml-3">
                                             <p class="text-sm text-blue-800">
                                                 Choose a name that helps you easily identify this location in your dashboard.
@@ -684,10 +667,7 @@
                                 {:else}
                                     <div class="flex items-center justify-center h-96 text-center">
                                         <div>
-                                            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                            </svg>
+                                            <Camera class="w-16 h-16 text-gray-400 mx-auto mb-4" />
                                             <h3 class="text-lg font-medium text-gray-900 mb-2">No Snapshot Available</h3>
                                             <p class="text-sm text-gray-600">Fetch a snapshot from the camera to define monitoring zones.</p>
                                         </div>
@@ -707,15 +687,10 @@
                                     class="w-full px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {#if snapshotLoading}
-                                        <svg class="w-4 h-4 mr-2 inline animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                        </svg>
+                                        <Loader2 class="w-4 h-4 mr-2 inline animate-spin" />
                                         Fetching Snapshot...
                                     {:else}
-                                        <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                        </svg>
+                                        <Camera class="w-4 h-4 mr-2 inline" />
                                         Fetch Snapshot
                                     {/if}
                                 </button>
@@ -772,10 +747,7 @@
                             <!-- Location Info -->
                             <div>
                                 <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1.5 flex items-center">
-                                    <svg class="w-3.5 h-3.5 text-gray-400 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    </svg>
+                                    <MapPin class="w-3.5 h-3.5 text-gray-400 mr-1.5" />
                                     Location
                                 </h4>
                                 <p class="text-sm font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded p-2.5">{locationName}</p>
@@ -784,9 +756,7 @@
                             <!-- Zones Info -->
                             <div>
                                 <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1.5 flex items-center">
-                                    <svg class="w-3.5 h-3.5 text-gray-400 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 9m0 8V9m0 0H9"></path>
-                                    </svg>
+                                    <Map class="w-3.5 h-3.5 text-gray-400 mr-1.5" />
                                     Monitoring Zones
                                 </h4>
 
@@ -812,9 +782,7 @@
                             <!-- Ready to Start -->
                             <div class="bg-green-50 border border-green-200 rounded p-3">
                                 <div class="flex items-start gap-2">
-                                    <svg class="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
+                                    <Check class="w-5 h-5 text-green-600 flex-shrink-0" />
                                     <div>
                                         <h5 class="text-xs font-bold text-green-900 mb-1">Ready to Start</h5>
                                         <p class="text-xs text-green-800">Click "Start Monitoring" to activate.</p>
@@ -859,9 +827,7 @@
                         disabled={currentStep === 1}
                         class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                        </svg>
+                        <ArrowLeft class="w-4 h-4 mr-2" />
                         Previous
                     </button>
 
@@ -873,9 +839,7 @@
                                 class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Next
-                                <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                                </svg>
+                                <ChevronRight class="w-4 h-4 ml-2" />
                             </button>
                         {:else}
                             <button
@@ -884,14 +848,10 @@
                                 class="inline-flex items-center px-6 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {#if startingSystem}
-                                    <svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                    </svg>
+                                    <Loader2 class="w-4 h-4 mr-2 animate-spin" />
                                     {systemStatusMessage || 'Starting...'}
                                 {:else}
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10v4a2 2 0 002 2h2a2 2 0 002-2v-4M9 10V9a2 2 0 00-2-2h-2a2 2 0 00-2 2v1"></path>
-                                    </svg>
+                                    <Save class="w-4 h-4 mr-2" />
                                     Start Monitoring
                                 {/if}
                             </button>
