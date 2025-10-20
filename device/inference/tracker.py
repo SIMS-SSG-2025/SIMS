@@ -2,6 +2,12 @@ from types import SimpleNamespace
 from ultralytics.trackers.bot_sort import BOTSORT
 import numpy as np
 from ultralytics.trackers.basetrack import BaseTrack
+from ultralytics import YOLO
+from ultralytics.utils.ops import xywh2xyxy
+from ultralytics.utils.plotting import save_one_box
+import torch
+import cv2
+
 class DetectionResults:
     def __init__(self, dets):
         flat_dets = []
@@ -20,8 +26,30 @@ class DetectionResults:
             self.conf = dets_array[:, 4]
             self.cls = dets_array[:, 5].astype(int)
 
+class ReIDEngine:
+    def __init__(self, model_path):
+        self.model = YOLO(model_path, task="classify")
+        self.model(embed=[-1], imgsz=224)
+
+    def __call__(self, img, dets):
+        feats = []
+
+        boxes = xywh2xyxy(torch.from_numpy(dets[:, :4]))
+        for box in boxes:
+            crop = save_one_box(box, img, save=False)
+            crop = cv2.resize(crop, (224, 224))
+            preds = self.model.predict(crop, verbose=False, imgsz=224)
+
+            feat = preds[0].squeeze(0)
+            if torch.is_tensor(feat):
+                feat = feat.cpu().numpy()
+
+            feats.append(np.squeeze(feat))
+
+        return feats
+
 class Tracker:
-    def __init__(self, class_names, cam_fps, with_reid=True, reid_model="yolo11n-cls.pt"):
+    def __init__(self, class_names, cam_fps, with_reid=True, reid_model="./device/training/models/yolo11n-cls.pt"):
         args = SimpleNamespace(
             track_buffer=360,
             track_high_thresh=0.3,
@@ -37,6 +65,7 @@ class Tracker:
         )
 
         self.tracker = BOTSORT(args, frame_rate=int(cam_fps))
+        self.tracker.encoder = ReIDEngine("device/training/models/yolo11-cls.engine")
         self.class_names = class_names
 
     def update(self, detections, frame):
