@@ -4,6 +4,7 @@
     import Modal from "$lib/components/modal.svelte";
     import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
     import LogModal from "$lib/components/LogModal.svelte";
+    import ChartModal from "$lib/components/ChartModal.svelte";
     import StatCard from "$lib/components/StatCard.svelte";
     import StatCardMulti from "$lib/components/StatCardMulti.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
@@ -20,15 +21,32 @@
         fetchEventsForLocation,
         calculateStatsFromEvents,
         fetchDetectionBarChartData,
-        fetchPPEComplianceData
+        fetchPPEComplianceData,
+        getMockDetectionBarChartData,
+        getMockChartModalData
     } from "$lib/api/stats";
+    import { chartPreferences } from "$lib/stores/chartPreferences";
 
     import { Settings, Download, PersonStanding, Car, TriangleAlert, Ban } from "lucide-svelte";
 
     let now = $state(new Date());
     let interval: any;
-    let selectedRange = $state<TimeRangeOption>("day");
+
+    // Subscribe to chart preferences store
+    let preferences = $state($chartPreferences);
+    let selectedRange = $state<TimeRangeOption>('week');
     let customTimeRange = $state<TimeRange | null>(null);
+
+    $effect(() => {
+        const unsubscribe = chartPreferences.subscribe(value => {
+            preferences = value;
+            selectedRange = value.selectedRange;
+            customTimeRange = value.customTimeRange;
+            // Reload charts when preferences change
+            loadChartData();
+        });
+        return () => unsubscribe();
+    });
     let activeTab = $state<'dashboard' | 'area'>('dashboard');
 
     let config = $state<Config | null>(null);
@@ -44,10 +62,53 @@
     });
     let statsLoading = $state(false);
 
-    let detectionChartData = $state<DetectionBarChartData>({
-        labels: [],
-        persons: [],
-        vehicles: []
+    // Chart data with all 4 series
+    let chartLabels = $state<string[]>([]);
+    let personsData = $state<number[]>([]);
+    let vehiclesData = $state<number[]>([]);
+    let ppeBreachesData = $state<number[]>([]);
+    let zoneEntriesData = $state<number[]>([]);
+
+    // Dynamically build datasets based on checkbox preferences
+    let chartDatasets = $derived(() => {
+        const datasets = [];
+        if (preferences.showPersons) {
+            datasets.push({
+                label: 'Persons',
+                data: personsData,
+                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 2
+            });
+        }
+        if (preferences.showVehicles) {
+            datasets.push({
+                label: 'Vehicles',
+                data: vehiclesData,
+                backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                borderColor: 'rgb(34, 197, 94)',
+                borderWidth: 2
+            });
+        }
+        if (preferences.showPPEBreaches) {
+            datasets.push({
+                label: 'PPE Breaches',
+                data: ppeBreachesData,
+                backgroundColor: 'rgba(251, 146, 60, 0.7)',
+                borderColor: 'rgb(251, 146, 60)',
+                borderWidth: 2
+            });
+        }
+        if (preferences.showZoneEntries) {
+            datasets.push({
+                label: 'Zone Entries',
+                data: zoneEntriesData,
+                backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                borderColor: 'rgb(239, 68, 68)',
+                borderWidth: 2
+            });
+        }
+        return datasets;
     });
 
     let ppeComplianceData = $state<PPEComplianceData>({
@@ -80,6 +141,7 @@
 
         loadConfiguration();
         loadStatistics(true); // Initial load
+        loadChartData(); // Initial chart load
 
         // Start polling every 5 seconds
         pollingInterval = setInterval(() => {
@@ -128,12 +190,10 @@
                         stats = calculateStatsFromEvents(response.events);
                         console.log("Loaded real stats from events:", $state.snapshot(stats));
 
-                        // Only update charts on initial load
-                        const [chartData, ppeData] = await Promise.all([
-                            fetchDetectionBarChartData(timeRange),
-                            fetchPPEComplianceData()
-                        ]);
-                        detectionChartData = chartData;
+                        // Load chart data separately
+                        await loadChartData();
+
+                        const ppeData = await fetchPPEComplianceData();
                         ppeComplianceData = ppeData;
                     } else {
                         // Incremental load: fetch only new events since last fetch
@@ -173,13 +233,8 @@
                     };
                 }
             } else if (isInitialLoad) {
-                // No config but initial load - load mock chart data
-                const [chartData, ppeData] = await Promise.all([
-                    fetchDetectionBarChartData(timeRange),
-                    fetchPPEComplianceData()
-                ]);
-                detectionChartData = chartData;
-                ppeComplianceData = ppeData;
+                // No config but initial load - load chart data
+                loadChartData();
             }
         } catch (error) {
             console.error("Error loading statistics:", error);
@@ -188,11 +243,43 @@
         }
     }
 
+    async function loadChartData() {
+        try {
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
+            const mockData = getMockChartModalData(timeRange);
+            const ppeData = await fetchPPEComplianceData();
+
+            // Store all data series
+            chartLabels = mockData.labels;
+            personsData = mockData.persons;
+            vehiclesData = mockData.vehicles;
+            ppeBreachesData = mockData.ppeBreaches;
+            zoneEntriesData = mockData.zoneEntries;
+
+            // PPE compliance data (pie chart - just set to zeros if hidden)
+            if (preferences.showPPEBreaches) {
+                ppeComplianceData = ppeData;
+            } else {
+                ppeComplianceData = {
+                    compliant: 0,
+                    missingHardHat: 0,
+                    missingVest: 0,
+                    missingBoth: 0
+                };
+            }
+        } catch (error) {
+            console.error("Error loading chart data:", error);
+        }
+    }
+
     // Modal state
     let showSettingsModal = $state(false);
     let showConfigModal = $state(false);
     let showLogModal = $state(false);
     let showDateRangePicker = $state(false);
+    let showChartModal = $state(false);
+    let chartModalType = $state<'bar' | 'line'>('bar');
+    let chartModalTitle = $state('Chart Details');
 
     function openSettingsModal() {
         showSettingsModal = true;
@@ -226,9 +313,25 @@
     function handleDateRangeApply(start: Date, end: Date) {
         customTimeRange = { start, end };
         selectedRange = 'custom';
+        // Update global store
+        chartPreferences.set({
+            ...preferences,
+            selectedRange: 'custom',
+            customTimeRange: { start, end }
+        });
         // Reload stats with new custom range
         lastFetchTime = null;
         loadStatistics(true);
+    }
+
+    function openChartModal(type: 'bar' | 'line', title: string) {
+        chartModalType = type;
+        chartModalTitle = title;
+        showChartModal = true;
+    }
+
+    function closeChartModal() {
+        showChartModal = false;
     }
 
     const ranges: { label: string; value: TimeRangeOption }[] = [
@@ -247,6 +350,12 @@
             openDateRangePicker();
         } else {
             customTimeRange = null;
+            // Update global store
+            chartPreferences.set({
+                ...preferences,
+                selectedRange: val,
+                customTimeRange: null
+            });
             // Reload stats if range actually changed
             if (rangeChanged && config?.locationId) {
                 lastFetchTime = null;
@@ -406,34 +515,54 @@
     <!-- Charts Row (2 charts only) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Detection Bar Chart - Persons & Vehicles -->
-        <div class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col">
-            <h3 class="text-lg font-semibold text-gray-700 mb-4">Detections Over Time</h3>
+        <div
+            class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
+            onclick={() => openChartModal('bar', 'Detections Over Time')}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => e.key === 'Enter' && openChartModal('bar', 'Detections Over Time')}
+        >
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-700">Detections Over Time</h3>
+                <svg
+                    class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23] transition-colors"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m0 0v6m0-6h6m-6 0H4" />
+                </svg>
+            </div>
             <div class="flex-1">
                 <BarChart
-                    labels={detectionChartData.labels}
-                    datasets={[
-                        {
-                            label: 'Persons',
-                            data: detectionChartData.persons,
-                            backgroundColor: 'rgba(231, 106, 35, 0.7)',
-                            borderColor: 'rgb(231, 106, 35)',
-                            borderWidth: 2
-                        },
-                        {
-                            label: 'Vehicles',
-                            data: detectionChartData.vehicles,
-                            backgroundColor: 'rgba(34, 197, 94, 0.7)',
-                            borderColor: 'rgb(34, 197, 94)',
-                            borderWidth: 2
-                        }
-                    ]}
+                    labels={chartLabels}
+                    datasets={chartDatasets()}
                 />
             </div>
+            <p class="text-xs text-gray-500 text-center mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                Click to expand and customize
+            </p>
         </div>
 
         <!-- PPE Compliance Pie Chart -->
-        <div class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col">
-            <h3 class="text-lg font-semibold text-gray-700 mb-4">PPE Compliance Breakdown</h3>
+        <div
+            class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
+            onclick={() => openChartModal('line', 'PPE Compliance Over Time')}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => e.key === 'Enter' && openChartModal('line', 'PPE Compliance Over Time')}
+        >
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-700">PPE Compliance Breakdown</h3>
+                <svg
+                    class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23] transition-colors"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m0 0v6m0-6h6m-6 0H4" />
+                </svg>
+            </div>
             <div class="flex-1">
                 <PieChart
                     labels={['Compliant', 'Missing Hard Hat', 'Missing Vest', 'Missing Both']}
@@ -452,6 +581,9 @@
                     isDoughnut={true}
                 />
             </div>
+            <p class="text-xs text-gray-500 text-center mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                Click to expand and customize
+            </p>
         </div>
     </div>
         </div>
@@ -516,6 +648,14 @@
         open={showDateRangePicker}
         onClose={closeDateRangePicker}
         onApply={handleDateRangeApply}
+    />
+
+    <ChartModal
+        bind:open={showChartModal}
+        onClose={closeChartModal}
+        chartType={chartModalType}
+        initialTitle={chartModalTitle}
+        locationId={config?.locationId}
     />
 </main>
 
