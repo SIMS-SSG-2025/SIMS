@@ -1,12 +1,14 @@
 <script lang="ts">
+    import type { Snippet } from 'svelte';
+
     type StatCardProps = {
         title: string;
         value: number;
-        icon: string;
+        icon: any;  // Lucide icon component
         iconColor?: string;
     };
 
-    let { title, value, icon, iconColor = 'text-blue-600' }: StatCardProps = $props();
+    let { title, value, icon: Icon, iconColor = 'text-blue-600' }: StatCardProps = $props();
 
     function formatNumber(num: number): string {
         return num.toLocaleString();
@@ -19,6 +21,6 @@
         <p class="text-3xl font-bold text-gray-800">{formatNumber(value)}</p>
     </div>
     <div class="p-3 rounded-full bg-gray-50 {iconColor}">
-        {@html icon}
+        <Icon class="h-6 w-6" />
     </div>
 </div>

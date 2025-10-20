@@ -5,6 +5,8 @@ export interface DashboardStats {
     detectedPersons: number;
     detectedVehicles: number;
     ppeBreaches: number;
+    helmetBreaches: number;
+    vestBreaches: number;
     forbiddenZoneEntries: number;
 }
 
@@ -59,20 +61,34 @@ export interface PPEComplianceData {
 
 // Helper function to calculate time range based on option
 export function calculateTimeRange(option: TimeRangeOption, customRange?: TimeRange): TimeRange {
-    const end = new Date();
+    const now = new Date();
+    let end = new Date();
     let start = new Date();
 
     switch (option) {
         case 'day':
+            // Current day from 00:00:00 to 23:59:59
             start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
             break;
         case 'week':
-            start.setDate(end.getDate() - 7);
+            // Current week from Monday to Sunday
+            const currentDay = now.getDay();
+            const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1; // If Sunday, go back 6 days, else go back to Monday
+            const daysToSunday = currentDay === 0 ? 0 : 7 - currentDay; // Days until Sunday
+            start = new Date(now);
+            start.setDate(now.getDate() - daysFromMonday);
             start.setHours(0, 0, 0, 0);
+            end = new Date(now);
+            end.setDate(now.getDate() + daysToSunday);
+            end.setHours(23, 59, 59, 999);
             break;
         case 'month':
-            start.setMonth(end.getMonth() - 1);
+            // Current month from 1st to last day
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
             start.setHours(0, 0, 0, 0);
+            end = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+            end.setHours(23, 59, 59, 999);
             break;
         case 'all':
             start = new Date(2020, 0, 1); // Default to a far past date
@@ -94,6 +110,8 @@ export function getMockStats(timeRange: TimeRange): DashboardStats {
         detectedPersons: Math.floor(Math.random() * 1000) + 100,
         detectedVehicles: Math.floor(Math.random() * 500) + 50,
         ppeBreaches: Math.floor(Math.random() * 50) + 5,
+        helmetBreaches: Math.floor(Math.random() * 30) + 3,
+        vestBreaches: Math.floor(Math.random() * 25) + 2,
         forbiddenZoneEntries: Math.floor(Math.random() * 30) + 2
     };
 }
@@ -189,6 +207,80 @@ export function getMockChartData(timeRange: TimeRange): ChartData {
         ppeBreaches: points.map(p => ({ ...p, value: Math.floor(Math.random() * 10) })),
         zoneEntries: points.map(p => ({ ...p, value: Math.floor(Math.random() * 8) }))
     };
+}
+
+// Enhanced mock data for chart modal with all four data series
+export function getMockChartModalData(timeRange: TimeRange): {
+    labels: string[];
+    persons: number[];
+    vehicles: number[];
+    ppeBreaches: number[];
+    zoneEntries: number[];
+} {
+    const labels: string[] = [];
+    const persons: number[] = [];
+    const vehicles: number[] = [];
+    const ppeBreaches: number[] = [];
+    const zoneEntries: number[] = [];
+
+    const hoursDiff = Math.floor((timeRange.end.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60));
+
+    if (hoursDiff <= 24) {
+        // Day view - hourly data
+        for (let i = 0; i < 24; i++) {
+            labels.push(`${i.toString().padStart(2, '0')}:00`);
+            persons.push(Math.floor(Math.random() * 50) + 10);
+            vehicles.push(Math.floor(Math.random() * 30) + 5);
+            ppeBreaches.push(Math.floor(Math.random() * 10));
+            zoneEntries.push(Math.floor(Math.random() * 8));
+        }
+    } else if (hoursDiff <= 168) {
+        // Week view - daily data (Monday to Sunday) with actual dates
+        const startDate = new Date(timeRange.start);
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+            const dayName = days[date.getDay()];
+            const monthName = months[date.getMonth()];
+            labels.push(`${dayName} ${monthName} ${date.getDate()}`);
+            persons.push(Math.floor(Math.random() * 200) + 50);
+            vehicles.push(Math.floor(Math.random() * 100) + 20);
+            ppeBreaches.push(Math.floor(Math.random() * 30) + 5);
+            zoneEntries.push(Math.floor(Math.random() * 20) + 3);
+        }
+    } else if (hoursDiff <= 744) { // Approximately one month
+        // Month view - daily data with formatted dates
+        const startDate = new Date(timeRange.start);
+        const endDate = new Date(timeRange.end);
+        const numDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        for (let i = 0; i < numDays; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+            const monthName = months[date.getMonth()];
+            labels.push(`${monthName} ${date.getDate()}`);
+            persons.push(Math.floor(Math.random() * 200) + 50);
+            vehicles.push(Math.floor(Math.random() * 100) + 20);
+            ppeBreaches.push(Math.floor(Math.random() * 30) + 5);
+            zoneEntries.push(Math.floor(Math.random() * 20) + 3);
+        }
+    } else {
+        // All time - weekly data
+        const numWeeks = 12;
+        for (let i = 0; i < numWeeks; i++) {
+            labels.push(`Week ${i + 1}`);
+            persons.push(Math.floor(Math.random() * 500) + 100);
+            vehicles.push(Math.floor(Math.random() * 300) + 50);
+            ppeBreaches.push(Math.floor(Math.random() * 80) + 20);
+            zoneEntries.push(Math.floor(Math.random() * 60) + 15);
+        }
+    }
+
+    return { labels, persons, vehicles, ppeBreaches, zoneEntries };
 }
 
 // Future API functions (to be implemented when backend endpoints are ready)
@@ -298,11 +390,15 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
     let detectedPersons = 0;
     let detectedVehicles = 0;
     let ppeBreaches = 0;
+    let helmetBreaches = 0;
+    let vestBreaches = 0;
     let forbiddenZoneEntries = 0;
 
     // Track unique objects to avoid counting duplicates
     const uniquePersons = new Set<number>();
     const uniqueVehicles = new Set<number>();
+    // Track unique persons with PPE breaches (one breach per person, regardless of what's missing)
+    const uniquePPEBreaches = new Set<number>();
 
     events.forEach(event => {
         // Assuming object_id differentiates between persons and vehicles
@@ -312,22 +408,38 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
         uniquePersons.add(event.object_id);
 
         // Check for PPE breaches (missing helmet or vest)
+        // Only count once per unique person (object_id)
         if (!event.has_helmet || !event.has_vest) {
-            ppeBreaches++;
+            uniquePPEBreaches.add(event.object_id);
+        }
+
+        // Count helmet breaches specifically
+        if (!event.has_helmet) {
+            helmetBreaches++;
+        }
+
+        // Count vest breaches specifically
+        if (!event.has_vest) {
+            vestBreaches++;
         }
 
         // Count forbidden zone entries (this assumes all events are zone entries)
         // You might want to add a flag in your Event type to distinguish entry types
-        forbiddenZoneEntries++;
+        if (event.zone_id != null) {
+            forbiddenZoneEntries++;
+        }
     });
 
     detectedPersons = uniquePersons.size;
     detectedVehicles = uniqueVehicles.size;
+    ppeBreaches = uniquePPEBreaches.size; // Count unique persons with breaches
 
     return {
         detectedPersons,
         detectedVehicles,
         ppeBreaches,
+        helmetBreaches,
+        vestBreaches,
         forbiddenZoneEntries
     };
 }

@@ -4,8 +4,10 @@
     import Modal from "$lib/components/modal.svelte";
     import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
     import LogModal from "$lib/components/LogModal.svelte";
+    import ChartModal from "$lib/components/ChartModal.svelte";
     import StatCard from "$lib/components/StatCard.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
+    import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
     import { onMount } from "svelte";
     import { fetchCurrentConfig, type Config } from "$lib/api/config";
     import {
@@ -17,16 +19,62 @@
         calculateTimeRange,
         fetchEventsForLocation,
         calculateStatsFromEvents,
+        calculatePPEComplianceFromEvents,
+        createChartDataFromEvents,
         fetchDetectionBarChartData,
-        fetchPPEComplianceData
+        fetchPPEComplianceData,
+        getMockDetectionBarChartData,
+        getMockChartModalData
     } from "$lib/api/stats";
+    import { chartPreferences } from "$lib/stores/chartPreferences";
 
-    import { Settings, Download, PersonStanding, Car, TriangleAlert, Ban } from "lucide-svelte";
+    import { Settings, Download, PersonStanding, Car, TriangleAlert, Ban, Users, FileText, ZoomIn, Sliders, Camera } from "lucide-svelte";
+
+    // ============================================
+    // DATA SOURCE CONFIGURATION
+    // ============================================
+    // Set this to false to use mock data for charts
+    const USE_REAL_DATA = true;
 
     let now = $state(new Date());
     let interval: any;
-    let selectedRange = $state<TimeRangeOption>("day");
+
+    // Auto-subscribe to chart preferences store using Svelte 5 rune
+    let preferences = $derived($chartPreferences);
+    let selectedRange = $state<TimeRangeOption>('week');
     let customTimeRange = $state<TimeRange | null>(null);
+
+    // Watch for store changes and sync local state
+    $effect(() => {
+        selectedRange = preferences.selectedRange;
+        customTimeRange = preferences.customTimeRange;
+    });
+
+    // Track previous time range to detect changes
+    let previousRange = $state<TimeRangeOption | null>(null);
+    let previousCustomRange = $state<TimeRange | null>(null);
+
+    // Only reload data when time range actually changes (not checkboxes)
+    $effect(() => {
+        const currentRange = preferences.selectedRange;
+        const currentCustom = preferences.customTimeRange;
+
+        // Skip initial run
+        if (previousRange === null) {
+            previousRange = currentRange;
+            previousCustomRange = currentCustom;
+            return;
+        }
+
+        // Only reload if time range changed (not checkbox changes)
+        if (previousRange !== currentRange ||
+            JSON.stringify(previousCustomRange) !== JSON.stringify(currentCustom)) {
+            previousRange = currentRange;
+            previousCustomRange = currentCustom;
+            loadChartData();
+        }
+    });
+
     let activeTab = $state<'dashboard' | 'area'>('dashboard');
 
     let config = $state<Config | null>(null);
@@ -36,14 +84,62 @@
         detectedPersons: 0,
         detectedVehicles: 0,
         ppeBreaches: 0,
+        helmetBreaches: 0,
+        vestBreaches: 0,
         forbiddenZoneEntries: 0
     });
     let statsLoading = $state(false);
 
-    let detectionChartData = $state<DetectionBarChartData>({
-        labels: [],
-        persons: [],
-        vehicles: []
+    // Chart data with all 4 series
+    let chartLabels = $state<string[]>([]);
+    let personsData = $state<number[]>([]);
+    let vehiclesData = $state<number[]>([]);
+    let ppeBreachesData = $state<number[]>([]);
+    let zoneEntriesData = $state<number[]>([]);
+
+    // Control whether chart updates should animate
+    let shouldAnimateCharts = $state(false);
+
+    // Dynamically build datasets based on checkbox preferences
+    let chartDatasets = $derived(() => {
+        const datasets = [];
+        if (preferences.showPersons) {
+            datasets.push({
+                label: 'Persons',
+                data: personsData,
+                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 2
+            });
+        }
+        if (preferences.showVehicles) {
+            datasets.push({
+                label: 'Vehicles',
+                data: vehiclesData,
+                backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                borderColor: 'rgb(34, 197, 94)',
+                borderWidth: 2
+            });
+        }
+        if (preferences.showPPEBreaches) {
+            datasets.push({
+                label: 'PPE Breaches',
+                data: ppeBreachesData,
+                backgroundColor: 'rgba(251, 146, 60, 0.7)',
+                borderColor: 'rgb(251, 146, 60)',
+                borderWidth: 2
+            });
+        }
+        if (preferences.showZoneEntries) {
+            datasets.push({
+                label: 'Zone Entries',
+                data: zoneEntriesData,
+                backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                borderColor: 'rgb(239, 68, 68)',
+                borderWidth: 2
+            });
+        }
+        return datasets;
     });
 
     let ppeComplianceData = $state<PPEComplianceData>({
@@ -52,6 +148,19 @@
         missingVest: 0,
         missingBoth: 0
     });
+
+    // Normalize zones for ZoneDrawer (convert absolute coordinates to 0-1 range if needed)
+    function normalizeZones(zones: any[], imageWidth: number, imageHeight: number) {
+        if (!zones || zones.length === 0) return [];
+
+        return zones.map(zone => ({
+            ...zone,
+            points: zone.points.map((p: any) => ({
+                x: p.x > 1 ? p.x / imageWidth : p.x,
+                y: p.y > 1 ? p.y / imageHeight : p.y
+            }))
+        }));
+    }
 
     let lastFetchTime = $state<Date | null>(null);
     let pollingInterval: any;
@@ -63,10 +172,12 @@
 
         loadConfiguration();
         loadStatistics(true); // Initial load
+        loadChartData(); // Initial chart load
 
         // Start polling every 5 seconds
         pollingInterval = setInterval(() => {
-            loadStatistics(false); // Incremental load
+            loadStatistics(false); // Update stats
+            updateChartDataSilently(); // Update chart data without animation
         }, 5000);
 
         return () => {
@@ -81,9 +192,10 @@
             config = await fetchCurrentConfig();
             console.log("Loaded config:", $state.snapshot(config));
 
-            // Reload statistics once config is available (we need location ID for real data)
+            // Reload statistics and charts once config is available (we need location ID for real data)
             if (config && config.locationId) {
-                await loadStatistics();
+                await loadStatistics(true);
+                await loadChartData();
             }
         } catch (error) {
             console.error("Error loading configuration:", error);
@@ -100,47 +212,26 @@
 
             if (config && config.locationId) {
                 try {
-                    let response;
+                    // Always fetch events for the selected time range
+                    // This ensures stats are accurate for the current view
+                    const response = await fetchEventsForLocation(config.locationId, timeRange);
 
-                    if (isInitialLoad || !lastFetchTime) {
-                        // Initial load: fetch all data for the time range
-                        response = await fetchEventsForLocation(config.locationId, timeRange);
-                        lastFetchTime = new Date();
+                    // Calculate stats from all events in time range
+                    stats = calculateStatsFromEvents(response.events);
 
-                        // Calculate stats for initial load
-                        stats = calculateStatsFromEvents(response.events);
-                        console.log("Loaded real stats from events:", $state.snapshot(stats));
+                    if (isInitialLoad) {
+                        console.log("Loaded initial stats from events:", $state.snapshot(stats));
+                        // Load chart data on initial load
+                        await loadChartData();
 
-                        // Only update charts on initial load
-                        const [chartData, ppeData] = await Promise.all([
-                            fetchDetectionBarChartData(timeRange),
-                            fetchPPEComplianceData()
-                        ]);
-                        detectionChartData = chartData;
+                        // Load PPE compliance data
+                        const ppeData = await fetchPPEComplianceData();
                         ppeComplianceData = ppeData;
                     } else {
-                        // Incremental load: fetch only new events since last fetch
-                        const incrementalRange = {
-                            start: lastFetchTime,
-                            end: new Date()
-                        };
-                        response = await fetchEventsForLocation(config.locationId, incrementalRange);
-
-                        // Merge new events with existing stats
-                        if (response.count > 0) {
-                            const newStats = calculateStatsFromEvents(response.events);
-                            stats = {
-                                detectedPersons: stats.detectedPersons + newStats.detectedPersons,
-                                detectedVehicles: stats.detectedVehicles + newStats.detectedVehicles,
-                                ppeBreaches: stats.ppeBreaches + newStats.ppeBreaches,
-                                forbiddenZoneEntries: stats.forbiddenZoneEntries + newStats.forbiddenZoneEntries
-                            };
-                            console.log(`Added ${response.count} new events to stats`);
-                        }
-
-                        lastFetchTime = new Date();
-                        // Don't update charts on incremental loads
+                        console.log(`Polling update: ${response.count} events in time range`);
                     }
+
+                    lastFetchTime = new Date();
                 } catch (error) {
                     console.error("Error fetching events for stats:", error);
                     // Fallback to zeros on error
@@ -148,17 +239,14 @@
                         detectedPersons: 0,
                         detectedVehicles: 0,
                         ppeBreaches: 0,
+                        helmetBreaches: 0,
+                        vestBreaches: 0,
                         forbiddenZoneEntries: 0
                     };
                 }
             } else if (isInitialLoad) {
-                // No config but initial load - load mock chart data
-                const [chartData, ppeData] = await Promise.all([
-                    fetchDetectionBarChartData(timeRange),
-                    fetchPPEComplianceData()
-                ]);
-                detectionChartData = chartData;
-                ppeComplianceData = ppeData;
+                // No config but initial load - load chart data
+                loadChartData();
             }
         } catch (error) {
             console.error("Error loading statistics:", error);
@@ -167,19 +255,175 @@
         }
     }
 
-    // Reload stats when time range changes (only if we have config)
-    $effect(() => {
-        if (selectedRange && config?.locationId) {
-            lastFetchTime = null; // Reset to force full load
-            loadStatistics(true);
-        }
-    });
+    async function loadChartData() {
+        try {
+            // Enable animations for intentional loads (initial/time period change)
+            shouldAnimateCharts = true;
 
-        // Modal state
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
+
+            // Debug: Log data source decision
+            console.log('loadChartData - Data Source Check:', {
+                USE_REAL_DATA,
+                hasConfig: !!config,
+                locationId: config?.locationId,
+                willUseRealData: USE_REAL_DATA && !!config?.locationId
+            });
+
+            if (USE_REAL_DATA && config?.locationId) {
+                // ============================================
+                // REAL DATA FROM API
+                // ============================================
+                console.log('📊 Loading REAL data from API...');
+
+                // Fetch events from the API
+                const eventsResponse = await fetchEventsForLocation(config.locationId, timeRange);
+                const events = eventsResponse.events;
+
+                console.log(`✅ Fetched ${events.length} events from API`);
+
+                // Transform events into chart data
+                const chartData = createChartDataFromEvents(events, timeRange);
+
+                // Convert ChartDataPoint[] to labels and data arrays for the bar chart
+                chartLabels = chartData.persons.map(point => {
+                    const date = new Date(point.timestamp);
+                    const hoursDiff = Math.floor((timeRange.end.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60));
+
+                    if (hoursDiff <= 24) {
+                        // Day view - show hours
+                        return `${date.getHours()}:00`;
+                    } else if (hoursDiff <= 168) {
+                        // Week view - show day names
+                        return date.toLocaleDateString('en-US', { weekday: 'short' });
+                    } else if (hoursDiff <= 720) {
+                        // Month view - show dates
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    } else {
+                        // All time - show weeks
+                        const weekNumber = Math.floor((date.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
+                        return `Week ${weekNumber}`;
+                    }
+                });
+
+                personsData = chartData.persons.map(point => point.value);
+                vehiclesData = chartData.vehicles.map(point => point.value);
+                ppeBreachesData = chartData.ppeBreaches.map(point => point.value);
+                zoneEntriesData = chartData.zoneEntries.map(point => point.value);
+
+                // Calculate PPE compliance data from events
+                const ppeData = calculatePPEComplianceFromEvents(events);
+                ppeComplianceData = preferences.showPPEBreaches ? ppeData : {
+                    compliant: 0,
+                    missingHardHat: 0,
+                    missingVest: 0,
+                    missingBoth: 0
+                };
+            } else {
+                // ============================================
+                // MOCK DATA (Fallback or when USE_REAL_DATA = false)
+                // ============================================
+                console.log('🎭 Loading MOCK data...', {
+                    reason: !USE_REAL_DATA ? 'USE_REAL_DATA is false' :
+                            !config ? 'No config loaded' :
+                            !config.locationId ? 'No locationId in config' :
+                            'Unknown'
+                });
+
+                const mockData = getMockChartModalData(timeRange);
+                const ppeData = await fetchPPEComplianceData();
+
+                // Store all data series
+                chartLabels = mockData.labels;
+                personsData = mockData.persons;
+                vehiclesData = mockData.vehicles;
+                ppeBreachesData = mockData.ppeBreaches;
+                zoneEntriesData = mockData.zoneEntries;
+
+                // PPE compliance data (pie chart)
+                ppeComplianceData = preferences.showPPEBreaches ? ppeData : {
+                    compliant: 0,
+                    missingHardHat: 0,
+                    missingVest: 0,
+                    missingBoth: 0
+                };
+            }
+        } catch (error) {
+            console.error("Error loading chart data:", error);
+            // Fallback to mock data on error
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
+            const mockData = getMockChartModalData(timeRange);
+            chartLabels = mockData.labels;
+            personsData = mockData.persons;
+            vehiclesData = mockData.vehicles;
+            ppeBreachesData = mockData.ppeBreaches;
+            zoneEntriesData = mockData.zoneEntries;
+        }
+    }
+
+    // Silent update for polling - updates data without triggering chart reinit/animation
+    async function updateChartDataSilently() {
+        try {
+            // Disable animations for polling updates
+            shouldAnimateCharts = false;
+
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
+
+            if (USE_REAL_DATA && config?.locationId) {
+                // Fetch events from the API
+                const eventsResponse = await fetchEventsForLocation(config.locationId, timeRange);
+                const events = eventsResponse.events;
+
+                // Transform events into chart data
+                const chartData = createChartDataFromEvents(events, timeRange);
+
+                // Silently update the data arrays (charts will react)
+                const hoursDiff = Math.floor((timeRange.end.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60));
+
+                chartLabels = chartData.persons.map(point => {
+                    const date = new Date(point.timestamp);
+
+                    if (hoursDiff <= 24) {
+                        return `${date.getHours()}:00`;
+                    } else if (hoursDiff <= 168) {
+                        return date.toLocaleDateString('en-US', { weekday: 'short' });
+                    } else if (hoursDiff <= 720) {
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    } else {
+                        const weekNumber = Math.floor((date.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
+                        return `Week ${weekNumber}`;
+                    }
+                });
+
+                personsData = chartData.persons.map(point => point.value);
+                vehiclesData = chartData.vehicles.map(point => point.value);
+                ppeBreachesData = chartData.ppeBreaches.map(point => point.value);
+                zoneEntriesData = chartData.zoneEntries.map(point => point.value);
+
+                // Update PPE compliance data
+                const ppeData = calculatePPEComplianceFromEvents(events);
+                ppeComplianceData = preferences.showPPEBreaches ? ppeData : {
+                    compliant: 0,
+                    missingHardHat: 0,
+                    missingVest: 0,
+                    missingBoth: 0
+                };
+            }
+            // If not using real data or no config, don't update (keep current data)
+        } catch (error) {
+            console.error("Error updating chart data:", error);
+            // On error, keep existing data
+        }
+    }
+
+    // Modal state
     let showSettingsModal = $state(false);
     let showConfigModal = $state(false);
     let showLogModal = $state(false);
     let showDateRangePicker = $state(false);
+    let showChartModal = $state(false);
+    let chartModalType = $state<'bar' | 'line'>('bar');
+    let chartModalTitle = $state('Chart Details');
 
     function openSettingsModal() {
         showSettingsModal = true;
@@ -194,6 +438,9 @@
         showConfigModal = false;
         // Reload configuration after modal closes to reflect any changes
         loadConfiguration();
+        // Reload stats with new config (reset for full load)
+        lastFetchTime = null;
+        loadStatistics(true);
     }
     function openLogModal() {
         showLogModal = true;
@@ -210,6 +457,25 @@
     function handleDateRangeApply(start: Date, end: Date) {
         customTimeRange = { start, end };
         selectedRange = 'custom';
+        // Update global store
+        chartPreferences.set({
+            ...preferences,
+            selectedRange: 'custom',
+            customTimeRange: { start, end }
+        });
+        // Reload stats with new custom range
+        lastFetchTime = null;
+        loadStatistics(true);
+    }
+
+    function openChartModal(type: 'bar' | 'line', title: string) {
+        chartModalType = type;
+        chartModalTitle = title;
+        showChartModal = true;
+    }
+
+    function closeChartModal() {
+        showChartModal = false;
     }
 
     const ranges: { label: string; value: TimeRangeOption }[] = [
@@ -221,12 +487,24 @@
     ];
 
     function selectRange(val: TimeRangeOption) {
+        const rangeChanged = selectedRange !== val;
         selectedRange = val;
         // If custom is selected, open the date picker
         if (val === 'custom') {
             openDateRangePicker();
         } else {
             customTimeRange = null;
+            // Update global store
+            chartPreferences.set({
+                ...preferences,
+                selectedRange: val,
+                customTimeRange: null
+            });
+            // Reload stats if range actually changed
+            if (rangeChanged && config?.locationId) {
+                lastFetchTime = null;
+                loadStatistics(true);
+            }
         }
     }
 
@@ -276,9 +554,7 @@
                 class="w-full px-4 py-3 bg-[#E76A23] text-white rounded-lg hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center justify-center gap-2"
                 onclick={openLogModal}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <FileText class="h-5 w-5" />
                     View Logs
                 </button>
             </div>
@@ -318,73 +594,62 @@
             title="Detected Persons"
             value={stats.detectedPersons}
             iconColor="text-[#E76A23]"
-            icon={`<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>`}
+            icon={Users}
         />
 
         <StatCard
             title="Detected Vehicles"
             value={stats.detectedVehicles}
             iconColor="text-green-600"
-            icon={`<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                <circle cx="9" cy="17" r="2" stroke="currentColor" stroke-width="2" fill="none"/>
-                <circle cx="19" cy="17" r="2" stroke="currentColor" stroke-width="2" fill="none"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h18l-2-6H5l-2 6zM3 12v5a1 1 0 001 1h1m14-6v5a1 1 0 01-1 1h-1" />
-            </svg>`}
+            icon={Car}
         />
 
         <StatCard
             title="PPE Compliance Breaches"
             value={stats.ppeBreaches}
             iconColor="text-orange-600"
-            icon={`<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>`}
+            icon={TriangleAlert}
         />
 
         <StatCard
             title="Forbidden Zone Entries"
             value={stats.forbiddenZoneEntries}
             iconColor="text-red-600"
-            icon={`<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-            </svg>`}
+            icon={Ban}
         />
     </div>
 
     <!-- Charts Row (2 charts only) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Detection Bar Chart - Persons & Vehicles -->
-        <div class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col">
-            <h3 class="text-lg font-semibold text-gray-700 mb-4">Detections Over Time</h3>
+        <div
+            class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
+            onclick={() => openChartModal('bar', 'Detections Over Time')}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => e.key === 'Enter' && openChartModal('bar', 'Detections Over Time')}
+        >
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-700">Detections Over Time</h3>
+                <ZoomIn class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23] transition-colors" />
+            </div>
             <div class="flex-1">
                 <BarChart
-                    labels={detectionChartData.labels}
-                    datasets={[
-                        {
-                            label: 'Persons',
-                            data: detectionChartData.persons,
-                            backgroundColor: 'rgba(231, 106, 35, 0.7)',
-                            borderColor: 'rgb(231, 106, 35)',
-                            borderWidth: 2
-                        },
-                        {
-                            label: 'Vehicles',
-                            data: detectionChartData.vehicles,
-                            backgroundColor: 'rgba(34, 197, 94, 0.7)',
-                            borderColor: 'rgb(34, 197, 94)',
-                            borderWidth: 2
-                        }
-                    ]}
+                    labels={chartLabels}
+                    datasets={chartDatasets()}
+                    animate={shouldAnimateCharts}
                 />
             </div>
+            <p class="text-xs text-gray-500 text-center mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                Click to expand and customize
+            </p>
         </div>
 
         <!-- PPE Compliance Pie Chart -->
         <div class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col">
-            <h3 class="text-lg font-semibold text-gray-700 mb-4">PPE Compliance Breakdown</h3>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-700">PPE Compliance Breakdown</h3>
+            </div>
             <div class="flex-1">
                 <PieChart
                     labels={['Compliant', 'Missing Hard Hat', 'Missing Vest', 'Missing Both']}
@@ -401,6 +666,7 @@
                         'rgba(239, 68, 68, 0.8)'
                     ]}
                     isDoughnut={true}
+                    animate={shouldAnimateCharts}
                 />
             </div>
         </div>
@@ -408,7 +674,7 @@
         </div>
     {:else if activeTab === 'area'}
         <!-- Area Management Content -->
-        <div class="px-8 py-8 max-w-7xl mx-auto">
+        <div class="px-8 max-w-7xl mx-auto">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">Area Management</h2>
                 <button
@@ -416,9 +682,7 @@
                     onclick={openConfigModal}
                     aria-label="Setup Configuration"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                    </svg>
+                    <Sliders class="h-5 w-5" />
                     Setup Configuration
                 </button>
             </div>
@@ -426,45 +690,23 @@
             <!-- Snapshot with Zones -->
             <div class="bg-white rounded-2xl shadow p-6">
                 <h3 class="text-lg font-semibold text-gray-700 mb-4">Camera View with Zones</h3>
-                <div class="relative bg-gray-100 rounded-lg overflow-hidden" style="min-height: 600px;">
+                <div class="p-6 flex items-center justify-center bg-gray-100 rounded-lg overflow-hidden" style="height: 600px;">
                     {#if config && config.snapshotPath}
-                        <img
-                            src={config.snapshotPath}
-                            alt="Camera snapshot"
-                            class="w-full h-auto"
-                        />
-                        <!-- Zone overlays -->
-                        {#if config.zones && config.zones.length > 0}
-                            <svg class="absolute top-0 left-0 w-full h-full pointer-events-none">
-                                {#each config.zones as zone, i}
-                                    <polygon
-                                        points={zone.points.map((p: any) => `${p.x},${p.y}`).join(' ')}
-                                        fill={i % 2 === 0 ? 'rgba(231, 106, 35, 0.3)' : 'rgba(239, 68, 68, 0.3)'}
-                                        stroke={i % 2 === 0 ? 'rgb(231, 106, 35)' : 'rgb(239, 68, 68)'}
-                                        stroke-width="2"
-                                    />
-                                    <text
-                                        x={zone.points[0].x}
-                                        y={zone.points[0].y - 5}
-                                        fill={i % 2 === 0 ? 'rgb(231, 106, 35)' : 'rgb(239, 68, 68)'}
-                                        font-size="14"
-                                        font-weight="bold"
-                                    >
-                                        {zone.name}
-                                    </text>
-                                {/each}
-                            </svg>
-                        {/if}
+                        <div class="w-full max-w-2xl max-h-full">
+                            <ZoneDrawer
+                                zones={normalizeZones(config.zones || [], 1920, 1080)}
+                                imageSrc={config.snapshotPath}
+                                width={1200}
+                                height={675}
+                                readOnly={true}
+                                onFinishZone={() => {}}
+                            />
+                        </div>
                     {:else}
-                        <div class="flex items-center justify-center h-full min-h-[600px]">
-                            <div class="text-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                <p class="text-gray-500 text-lg">No snapshot available</p>
-                                <p class="text-gray-400 text-sm mt-2">Configure camera settings to capture a snapshot</p>
-                            </div>
+                        <div class="text-center">
+                            <Camera class="h-20 w-20 text-gray-300 mx-auto mb-4" />
+                            <p class="text-gray-500 text-lg font-medium mb-2">No snapshot available</p>
+                            <p class="text-gray-400 text-sm">Configure camera settings to capture a snapshot</p>
                         </div>
                     {/if}
                 </div>
@@ -486,6 +728,14 @@
         open={showDateRangePicker}
         onClose={closeDateRangePicker}
         onApply={handleDateRangeApply}
+    />
+
+    <ChartModal
+        bind:open={showChartModal}
+        onClose={closeChartModal}
+        chartType={chartModalType}
+        initialTitle={chartModalTitle}
+        locationId={config?.locationId}
     />
 </main>
 

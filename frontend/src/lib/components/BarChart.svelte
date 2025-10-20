@@ -18,9 +18,10 @@
             borderWidth?: number;
         }[];
         title?: string;
+        animate?: boolean;  // Control whether to animate updates
     };
 
-    let { labels, datasets, title = "" }: BarChartProps = $props();
+    let { labels, datasets, title = "", animate = false }: BarChartProps = $props();
 
     let canvasElement: HTMLCanvasElement;
     let chart: Chart | null = null;
@@ -37,6 +38,10 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                    duration: 750,  // Smooth animation duration in milliseconds
+                    easing: 'easeInOutQuart'
+                },
                 plugins: {
                     legend: {
                         position: "top" as const,
@@ -83,7 +88,8 @@
         if (chart) {
             chart.data.labels = $state.snapshot(labels);
             chart.data.datasets = $state.snapshot(datasets);
-            chart.update();
+            // Use animation based on the animate prop
+            chart.update(animate ? 'active' : 'none');
         }
     });
 </script>

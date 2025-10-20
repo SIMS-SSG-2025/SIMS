@@ -14,9 +14,10 @@
         backgroundColor: string[];
         title?: string;
         isDoughnut?: boolean;
+        animate?: boolean;  // Control whether to animate updates
     };
 
-    let { labels, data, backgroundColor, title = "  ", isDoughnut = true }: PieChartProps = $props();
+    let { labels, data, backgroundColor, title = "  ", isDoughnut = true, animate = false }: PieChartProps = $props();
 
     let canvasElement: HTMLCanvasElement;
     let chart: Chart | null = null;
@@ -38,6 +39,10 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                    duration: 750,  // Smooth animation duration in milliseconds
+                    easing: 'easeInOutQuart'
+                },
                 plugins: {
                     legend: {
                         position: "bottom" as const,
@@ -86,7 +91,8 @@
             chart.data.labels = $state.snapshot(labels);
             chart.data.datasets[0].data = $state.snapshot(data);
             chart.data.datasets[0].backgroundColor = $state.snapshot(backgroundColor);
-            chart.update();
+            // Use animation based on the animate prop
+            chart.update(animate ? 'active' : 'none');
         }
     });
 </script>

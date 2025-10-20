@@ -1,6 +1,7 @@
 <script lang="ts">
     import Modal from "./modal.svelte";
     import { onMount, onDestroy } from "svelte";
+    import { XCircle, AlertTriangle, Info as InfoIcon, CheckCircle, FileText } from 'lucide-svelte';
 
     export let open: boolean = false;
     export let onClose: () => void = () => {};
@@ -165,9 +166,7 @@
                         class="rounded border-gray-300 text-red-600 focus:ring-red-500"
                     />
                     <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-800">
-                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                        </svg>
+                        <XCircle class="w-3 h-3 mr-1" />
                         ERROR
                     </span>
                 </label>
@@ -179,9 +178,7 @@
                         class="rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
                     />
                     <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-800">
-                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                        </svg>
+                        <AlertTriangle class="w-3 h-3 mr-1" />
                         WARNING
                     </span>
                 </label>
@@ -193,9 +190,7 @@
                         class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                     <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-800">
-                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                        </svg>
+                        <InfoIcon class="w-3 h-3 mr-1" />
                         INFO
                     </span>
                 </label>
@@ -207,9 +202,7 @@
                         class="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                     />
                     <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-purple-100 text-purple-800">
-                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" clip-rule="evenodd"/>
-                        </svg>
+                        <CheckCircle class="w-3 h-3 mr-1" />
                         DETECTION
                     </span>
                 </label>
@@ -289,9 +282,7 @@
                 </div>
             {:else}
                 <div class="text-center text-gray-500 py-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+                    <FileText class="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     {#if logs.length > 0}
                         <p>No logs match the current filters.</p>
                         <p class="text-sm mt-2">Try adjusting your filter settings above.</p>
