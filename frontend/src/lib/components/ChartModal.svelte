@@ -30,7 +30,10 @@
         locationId
     }: ChartModalProps = $props();
 
-    // Use global store for preferences
+    // Auto-subscribe to global store using Svelte 5 rune
+    let preferences = $derived($chartPreferences);
+
+    // Local state synced with store
     let showPersons = $state($chartPreferences.showPersons);
     let showVehicles = $state($chartPreferences.showVehicles);
     let showPPEBreaches = $state($chartPreferences.showPPEBreaches);
@@ -38,17 +41,14 @@
     let selectedRange = $state<TimeRangeOption>($chartPreferences.selectedRange);
     let customTimeRange = $state<TimeRange | null>($chartPreferences.customTimeRange);
 
-    // Sync with store changes
+    // Sync local state when store changes
     $effect(() => {
-        const unsubscribe = chartPreferences.subscribe(value => {
-            showPersons = value.showPersons;
-            showVehicles = value.showVehicles;
-            showPPEBreaches = value.showPPEBreaches;
-            showZoneEntries = value.showZoneEntries;
-            selectedRange = value.selectedRange;
-            customTimeRange = value.customTimeRange;
-        });
-        return () => unsubscribe();
+        showPersons = preferences.showPersons;
+        showVehicles = preferences.showVehicles;
+        showPPEBreaches = preferences.showPPEBreaches;
+        showZoneEntries = preferences.showZoneEntries;
+        selectedRange = preferences.selectedRange;
+        customTimeRange = preferences.customTimeRange;
     });
 
     let showCustomDatePicker = $state(false);

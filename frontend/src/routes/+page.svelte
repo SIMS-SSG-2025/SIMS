@@ -32,21 +32,42 @@
     let now = $state(new Date());
     let interval: any;
 
-    // Subscribe to chart preferences store
-    let preferences = $state($chartPreferences);
+    // Auto-subscribe to chart preferences store using Svelte 5 rune
+    let preferences = $derived($chartPreferences);
     let selectedRange = $state<TimeRangeOption>('week');
     let customTimeRange = $state<TimeRange | null>(null);
 
+    // Watch for store changes and sync local state
     $effect(() => {
-        const unsubscribe = chartPreferences.subscribe(value => {
-            preferences = value;
-            selectedRange = value.selectedRange;
-            customTimeRange = value.customTimeRange;
-            // Reload charts when preferences change
-            loadChartData();
-        });
-        return () => unsubscribe();
+        selectedRange = preferences.selectedRange;
+        customTimeRange = preferences.customTimeRange;
     });
+
+    // Track previous time range to detect changes
+    let previousRange = $state<TimeRangeOption | null>(null);
+    let previousCustomRange = $state<TimeRange | null>(null);
+
+    // Only reload data when time range actually changes (not checkboxes)
+    $effect(() => {
+        const currentRange = preferences.selectedRange;
+        const currentCustom = preferences.customTimeRange;
+
+        // Skip initial run
+        if (previousRange === null) {
+            previousRange = currentRange;
+            previousCustomRange = currentCustom;
+            return;
+        }
+
+        // Only reload if time range changed (not checkbox changes)
+        if (previousRange !== currentRange ||
+            JSON.stringify(previousCustomRange) !== JSON.stringify(currentCustom)) {
+            previousRange = currentRange;
+            previousCustomRange = currentCustom;
+            loadChartData();
+        }
+    });
+
     let activeTab = $state<'dashboard' | 'area'>('dashboard');
 
     let config = $state<Config | null>(null);
@@ -545,23 +566,9 @@
         </div>
 
         <!-- PPE Compliance Pie Chart -->
-        <div
-            class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
-            onclick={() => openChartModal('line', 'PPE Compliance Over Time')}
-            role="button"
-            tabindex="0"
-            onkeydown={(e) => e.key === 'Enter' && openChartModal('line', 'PPE Compliance Over Time')}
-        >
+        <div class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-700">PPE Compliance Breakdown</h3>
-                <svg
-                    class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23] transition-colors"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m0 0v6m0-6h6m-6 0H4" />
-                </svg>
             </div>
             <div class="flex-1">
                 <PieChart
@@ -581,9 +588,6 @@
                     isDoughnut={true}
                 />
             </div>
-            <p class="text-xs text-gray-500 text-center mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                Click to expand and customize
-            </p>
         </div>
     </div>
         </div>
