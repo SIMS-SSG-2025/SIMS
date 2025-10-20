@@ -1,189 +1,205 @@
 import sqlite3
 import json
-from device.utils.logger import get_logger
-
 
 class DatabaseManager:
-    def __init__(self,db_path):
+    def __init__(self, db_path):
         self.db_path = db_path
-        self.sqlconn = sqlite3.connect(self.db_path,check_same_thread=False)
-        self.cursor = self.sqlconn.cursor()
+        self.sqlconn = sqlite3.connect(self.db_path, check_same_thread=False)
 
-        self._configure_pragma()
+    def insert_object(self, object_id, object_type):
+        with self.sqlconn:
+            self.sqlconn.execute(
+                "INSERT INTO object (object_id, type) VALUES (?, ?)",
+                (object_id, object_type),
+            )
 
-    def _configure_pragma(self):
-        self.cursor.execute("PRAGMA journal_mode=WAL;")
-        self.cursor.execute("PRAGMA synchronous=NORMAL;")
-        self.sqlconn.commit()
+    def insert_events(self, object_id, zone_id, location_id, has_helmet, has_vest, time):
+        with self.sqlconn:
+            self.sqlconn.execute(
+                """INSERT INTO events (object_id, zone_id, location_id, has_helmet, has_vest, time)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (object_id, zone_id, location_id, has_helmet, has_vest, time),
+            )
 
-    def insert_object(self,object_id,object_type):
-        self.cursor.execute("""INSERT INTO object (object_id,type) VALUES (?,?)""", (object_id,object_type))
-        self.sqlconn.commit()
+    def insert_zone(self, points, name, location_id):
+        coords_json = json.dumps(points)
+        with self.sqlconn:
+            self.sqlconn.execute(
+                "INSERT INTO zones (coords, name, location_id) VALUES (?, ?, ?)",
+                (coords_json, name, location_id),
+            )
+
+    def insert_location(self, name):
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                "INSERT INTO location (name) VALUES (?)", (name,)
+            )
+            return cursor.lastrowid
+
+    def insert_location_and_activate(self, name):
+        with self.sqlconn:
+            self.sqlconn.execute("UPDATE location SET is_active = 0")
+            cursor = self.sqlconn.execute(
+                "INSERT INTO location (name, is_active) VALUES (?, 1)", (name,)
+            )
+            return cursor.lastrowid
+
+    def insert_object_positions(self, data):
+        if not data:
+            return
+        with self.sqlconn:
+            self.sqlconn.executemany(
+                """INSERT INTO object_positions (object_id, location, x, y, time)
+                   VALUES (?, ?, ?, ?, ?)""",
+                data,
+            )
 
 
-    def insert_events(self,object_id,zone_id,location_id,has_helmet,has_vest,time):
-        self.cursor.execute("""INSERT INTO events (object_id,zone_id,location_id,has_helmet,has_vest,time)
-        VALUES (?,?,?,?,?,?)""",
-        (object_id,zone_id,location_id,has_helmet,has_vest,time))
-        self.sqlconn.commit()
+    def set_ai_running(self, value: bool):
+        with self.sqlconn:
+            self.sqlconn.execute(
+                "UPDATE system_config SET ai_running=? WHERE system_config_id=1",
+                (1 if value else 0,),
+            )
 
+    def set_active_location(self, location_id):
+        with self.sqlconn:
+            self.sqlconn.execute("UPDATE location SET is_active = 0")
+            self.sqlconn.execute(
+                "UPDATE location SET is_active = 1 WHERE location_id = ?",
+                (location_id,),
+            )
+
+    def delete_zones_by_location(self, location_id):
+        with self.sqlconn:
+            self.sqlconn.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
+
+    def delete_location(self, location_id):
+        with self.sqlconn:
+            self.sqlconn.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
+            self.sqlconn.execute(
+                "DELETE FROM location WHERE location_id = ?", (location_id,)
+            )
 
 
     def get_event(self):
-        self.cursor.execute("SELECT * from events")
-        rows = self.cursor.fetchall()
-
-        return rows
-
-    def insert_zone(self, points,name,location_id):
-        coords_json = json.dumps(points)
-        self.cursor.execute("""INSERT INTO zones (coords,name,location_id) VALUES (?,?,?)""", (coords_json,name,location_id))
-        self.sqlconn.commit()
+        with self.sqlconn:
+            cursor = self.sqlconn.execute("SELECT * FROM events")
+            return cursor.fetchall()
 
     def fetch_all_zones(self, location_id):
-        self.cursor.execute("SELECT * from zones WHERE location_id=?", (location_id,))
-        rows = self.cursor.fetchall()
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                "SELECT * FROM zones WHERE location_id=?", (location_id,)
+            )
+            rows = cursor.fetchall()
+
         zones = []
         for row in rows:
-            zone_id,location_id,coords_json,name = row
+            zone_id, location_id, coords_json, name = row
             coords = json.loads(coords_json)
-            zones.append({"zone_id":zone_id,"location_id":location_id,"coords":coords,"name":name})
+            zones.append(
+                {
+                    "zone_id": zone_id,
+                    "location_id": location_id,
+                    "coords": coords,
+                    "name": name,
+                }
+            )
         return zones
 
-    def set_ai_running(self,value: bool):
-        self.cursor.execute("UPDATE system_config SET ai_running=? WHERE system_config_id=1",(1 if value else 0,))
-        self.sqlconn.commit()
-
     def get_ai_running(self) -> bool:
-        self.cursor.execute("SELECT ai_running FROM system_config WHERE system_config_id=1")
-        result = self.cursor.fetchone()
-        if result:
-            return result[0] == 1
-        return False
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                "SELECT ai_running FROM system_config WHERE system_config_id=1"
+            )
+            result = cursor.fetchone()
+            return bool(result and result[0] == 1)
 
     def get_latest_object_id(self):
-        self.cursor.execute("SELECT MAX(object_id) FROM object")
-        result = self.cursor.fetchone()
-        if result and result[0]:
-            return result[0]
-        return 0
+        with self.sqlconn:
+            cursor = self.sqlconn.execute("SELECT MAX(object_id) FROM object")
+            result = cursor.fetchone()
+            return result[0] if result and result[0] else 0
 
     def get_latest_location(self):
-        self.cursor.execute("SELECT location_id, name FROM location ORDER BY location_id DESC LIMIT 1")
-        return self.cursor.fetchone()
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                "SELECT location_id, name FROM location ORDER BY location_id DESC LIMIT 1"
+            )
+            return cursor.fetchone()
 
     def get_active_location(self):
-        """Get the currently active location."""
-        cursor = self.sqlconn.cursor()
-        cursor.execute("SELECT location_id, name FROM location WHERE is_active = 1 LIMIT 1")
-        result = cursor.fetchone()
-        cursor.close()
-        return result
-
-    def set_active_location(self, location_id):
-        """Set a location as active (and deactivate all others)."""
-        # Deactivate all locations
-        self.cursor.execute("UPDATE location SET is_active = 0")
-        # Activate the specified location
-        self.cursor.execute("UPDATE location SET is_active = 1 WHERE location_id = ?", (location_id,))
-        self.sqlconn.commit()
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                "SELECT location_id, name FROM location WHERE is_active = 1 LIMIT 1"
+            )
+            return cursor.fetchone()
 
     def get_zones_by_location(self, location_id):
-        # Use a separate cursor to avoid recursive cursor issues
-        cursor = self.sqlconn.cursor()
-        cursor.execute("SELECT * FROM zones WHERE location_id=?", (location_id,))
-        rows = cursor.fetchall()
-        cursor.close()
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                "SELECT * FROM zones WHERE location_id=?", (location_id,)
+            )
+            rows = cursor.fetchall()
 
         zones = []
         for row in rows:
             zone_id, loc_id, coords_json, name = row
             coords = json.loads(coords_json)
-            zones.append({"zone_id": zone_id, "location_id": loc_id, "coords": coords, "name": name})
+            zones.append(
+                {"zone_id": zone_id, "location_id": loc_id, "coords": coords, "name": name}
+            )
         return zones
 
     def get_location_by_name(self, name):
-        cursor = self.sqlconn.cursor()
-        cursor.execute("SELECT location_id FROM location WHERE name=?", (name,))
-        result = cursor.fetchone()
-        cursor.close()
-        if result:
-            return result[0]
-        return None
-
-    def insert_location(self, name):
-        self.cursor.execute("INSERT INTO location (name) VALUES (?)", (name,))
-        self.sqlconn.commit()
-        return self.cursor.lastrowid
-
-    def insert_object_positions(self, data):
-        self.cursor.executemany("""
-            INSERT INTO object_positions (object_id, location, x, y, time)
-            VALUES (?, ?, ?, ?, ?)
-        """, data)
-        self.sqlconn.commit()
-
-    def insert_location_and_activate(self, name):
-        """Insert a new location and set it as active."""
-        # Deactivate all other locations first
-        self.cursor.execute("UPDATE location SET is_active = 0")
-        # Insert new location as active
-        self.cursor.execute("INSERT INTO location (name, is_active) VALUES (?, 1)", (name,))
-        self.sqlconn.commit()
-        return self.cursor.lastrowid
-
-    def delete_zones_by_location(self, location_id):
-        """Delete all zones for a specific location."""
-        self.cursor.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
-        self.sqlconn.commit()
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                "SELECT location_id FROM location WHERE name=?", (name,)
+            )
+            result = cursor.fetchone()
+            return result[0] if result else None
 
     def get_all_locations(self):
-        # Use a separate cursor to avoid recursive cursor issues
-        cursor = self.sqlconn.cursor()
-        cursor.execute("""
-        SELECT l.location_id, l.name, COUNT(z.zone_id) as zone_count
-        FROM location l
-        LEFT JOIN zones z ON l.location_id = z.location_id
-        GROUP BY l.location_id, l.name
-        ORDER BY l.location_id DESC
-    """)
-        rows = cursor.fetchall()
-        cursor.close()
-        return rows
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                """
+                SELECT l.location_id, l.name, COUNT(z.zone_id) as zone_count
+                FROM location l
+                LEFT JOIN zones z ON l.location_id = z.location_id
+                GROUP BY l.location_id, l.name
+                ORDER BY l.location_id DESC
+                """
+            )
+            return cursor.fetchall()
 
     def get_location_by_id(self, location_id):
-        """Get location by ID."""
-        cursor = self.sqlconn.cursor()
-        cursor.execute("""
-            SELECT location_id, name
-            FROM location
-            WHERE location_id = ?
-        """, (location_id,))
-        result = cursor.fetchone()
-        cursor.close()
-        return result
-
-    def delete_location(self, location_id):
-        """Delete a location and all its zones."""
-        # Delete zones first (foreign key constraint)
-        self.cursor.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
-        # Delete the location
-        self.cursor.execute("DELETE FROM location WHERE location_id = ?", (location_id,))
-        self.sqlconn.commit()
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                "SELECT location_id, name FROM location WHERE location_id = ?",
+                (location_id,),
+            )
+            return cursor.fetchone()
 
     def get_all_events(self):
-        """Get all events from the database."""
-        self.cursor.execute("SELECT * FROM events")
-        return self.cursor.fetchall()
+        with self.sqlconn:
+            cursor = self.sqlconn.execute("SELECT * FROM events")
+            return cursor.fetchall()
 
     def get_events_by_date(self, location_id: int, start_date: str, end_date: str):
-        query = """ SELECT * FROM events WHERE location_id = ? AND DATE(time) BETWEEN ? AND ? ORDER BY time"""
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                """
+                SELECT * FROM events
+                WHERE location_id = ? AND DATE(time) BETWEEN ? AND ?
+                ORDER BY time
+                """,
+                (location_id, start_date, end_date),
+            )
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
 
-        self.cursor.execute(query,(location_id,start_date,end_date))
-        rows = self.cursor.fetchall()
-        columns = [desc[0] for desc in self.cursor.description]
-        results = [dict(zip(columns,rows)) for rows in rows]
-        return results
 
     def __del__(self):
         if hasattr(self, "sqlconn"):
