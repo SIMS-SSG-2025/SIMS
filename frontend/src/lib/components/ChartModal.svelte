@@ -616,6 +616,11 @@
                                     {range.label}
                                 </button>
                             {/each}
+                            {#if selectedRange === 'custom' && customTimeRange}
+                                <span class="flex items-center text-sm text-gray-600 px-3 py-1 bg-orange-50 rounded-full border border-orange-200">
+                                    {customTimeRange.start.toLocaleDateString('sv-SE')} - {customTimeRange.end.toLocaleDateString('sv-SE')}
+                                </span>
+                            {/if}
                         </div>
 
                         <!-- Chart Type Toggle Buttons -->
