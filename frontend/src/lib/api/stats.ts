@@ -60,7 +60,7 @@ export interface PPEComplianceData {
 }
 
 // Helper function to calculate time range based on option
-export function calculateTimeRange(option: TimeRangeOption, customRange?: TimeRange): TimeRange {
+export function calculateTimeRange(option: TimeRangeOption, customRange?: TimeRange, earliestEventTime?: Date): TimeRange {
     const now = new Date();
     let end = new Date();
     let start = new Date();
@@ -91,7 +91,13 @@ export function calculateTimeRange(option: TimeRangeOption, customRange?: TimeRa
             end.setHours(23, 59, 59, 999);
             break;
         case 'all':
-            start = new Date(2020, 0, 1); // Default to a far past date
+            // Use earliest event time if provided, otherwise fallback to 2020
+            if (earliestEventTime) {
+                start = new Date(earliestEventTime);
+                start.setHours(0, 0, 0, 0);
+            } else {
+                start = new Date(2020, 0, 1);
+            }
             break;
         case 'custom':
             if (customRange) {
@@ -101,6 +107,19 @@ export function calculateTimeRange(option: TimeRangeOption, customRange?: TimeRa
     }
 
     return { start, end };
+}
+
+/**
+ * Find the earliest event timestamp from an array of events
+ * @param events - Array of Event objects
+ * @returns Date of earliest event, or null if no events
+ */
+export function findEarliestEventTime(events: Event[]): Date | null {
+    if (events.length === 0) return null;
+
+    const timestamps = events.map(event => new Date(event.time).getTime());
+    const earliestTimestamp = Math.min(...timestamps);
+    return new Date(earliestTimestamp);
 }
 
 // Mock data for development (to be replaced with API calls)
@@ -595,8 +614,28 @@ export function createChartDataFromEvents(
     timeRange: TimeRange
 ): ChartData {
     const hoursDiff = Math.floor((timeRange.end.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60));
-    const numPoints = Math.min(Math.max(hoursDiff, 12), 48); // Between 12 and 48 points
-    const intervalMs = (timeRange.end.getTime() - timeRange.start.getTime()) / numPoints;
+
+    // Determine number of intervals based on time range
+    let numPoints: number;
+    let intervalMs: number;
+
+    if (hoursDiff <= 24) {
+        // Day view - 24 hourly intervals
+        numPoints = 24;
+        intervalMs = 60 * 60 * 1000; // 1 hour
+    } else if (hoursDiff <= 168) {
+        // Week view - 7 daily intervals
+        numPoints = 7;
+        intervalMs = 24 * 60 * 60 * 1000; // 1 day
+    } else if (hoursDiff <= 720) {
+        // Month view - daily intervals
+        numPoints = Math.ceil(hoursDiff / 24);
+        intervalMs = 24 * 60 * 60 * 1000; // 1 day
+    } else {
+        // All time - weekly intervals
+        numPoints = Math.ceil(hoursDiff / 168);
+        intervalMs = 7 * 24 * 60 * 60 * 1000; // 1 week
+    }
 
     const persons: ChartDataPoint[] = [];
     const vehicles: ChartDataPoint[] = [];

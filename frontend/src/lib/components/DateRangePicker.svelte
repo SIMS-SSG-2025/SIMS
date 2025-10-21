@@ -49,15 +49,25 @@
             return;
         }
 
+        // Validate dates before setting time
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDateOnly = new Date(endDate);
+        endDateOnly.setHours(0, 0, 0, 0);
+
         if (start > end) {
             error = 'Start date must be before end date';
             return;
         }
 
-        if (end > new Date()) {
+        if (endDateOnly > today) {
             error = 'End date cannot be in the future';
             return;
         }
+
+        // Set start to beginning of day and end to end of day
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
 
         onApply(start, end);
         onClose();
@@ -67,6 +77,10 @@
         const end = new Date();
         const start = new Date();
         start.setDate(end.getDate() - days);
+
+        // Set to start and end of days for clarity
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
 
         startDate = formatDateForInput(start);
         endDate = formatDateForInput(end);

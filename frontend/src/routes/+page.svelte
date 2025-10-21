@@ -16,12 +16,13 @@
         type TimeRange,
         type DetectionBarChartData,
         type PPEComplianceData,
+        type Event,
         calculateTimeRange,
         fetchEventsForLocation,
         calculateStatsFromEvents,
         calculatePPEComplianceFromEvents,
-        createBarChartDataFromEvents,
         createChartDataFromEvents,
+        findEarliestEventTime,
         fetchDetectionBarChartData,
         fetchPPEComplianceData,
         getMockDetectionBarChartData,
@@ -109,6 +110,7 @@
     let zoneEntriesData = $state<number[]>([]);
     let chartDataVersion = $state(0); // Increment this to force chart re-render
     let isChartDataLoading = $state(false); // Prevent updates during loading
+    let earliestEventTime = $state<Date | null>(null); // Store earliest event for "All" time range
 
     // Control whether chart updates should animate
     let shouldAnimateCharts = $state(false);
@@ -179,6 +181,50 @@
     let pollingInterval: any;
     let isInitialLoadComplete = $state(false);
 
+    // Event cache to avoid re-fetching data when switching time periods
+    interface EventCache {
+        locationId: number;
+        events: Event[];
+        fetchTime: Date;
+        timeRange: TimeRange;
+    }
+    let eventCache = $state<EventCache | null>(null);
+
+    // Check if cached data is still valid for the requested time range
+    function isCacheValid(locationId: number, requestedRange: TimeRange): boolean {
+        if (!eventCache || eventCache.locationId !== locationId) {
+            return false;
+        }
+
+        // Check if cached time range covers the requested range
+        const cacheStart = eventCache.timeRange.start.getTime();
+        const cacheEnd = eventCache.timeRange.end.getTime();
+        const requestStart = requestedRange.start.getTime();
+        const requestEnd = requestedRange.end.getTime();
+
+        // Cache is valid if it covers or equals the requested range
+        return cacheStart <= requestStart && cacheEnd >= requestEnd;
+    }
+
+    // Filter cached events to the requested time range
+    function filterCachedEvents(requestedRange: TimeRange): Event[] {
+        if (!eventCache) return [];
+
+        return eventCache.events.filter(event => {
+            const eventTime = new Date(event.time).getTime();
+            return eventTime >= requestedRange.start.getTime() &&
+                   eventTime <= requestedRange.end.getTime();
+        });
+    }
+
+    // Clear cache and earliest event time when location changes
+    $effect(() => {
+        if (config?.locationId !== eventCache?.locationId) {
+            eventCache = null;
+            earliestEventTime = null;
+        }
+    });
+
     onMount(() => {
         interval = setInterval(() => {
             now = new Date();
@@ -190,7 +236,7 @@
         // Start polling every 5 seconds after initial load
         pollingInterval = setInterval(() => {
             if (isInitialLoadComplete) {
-                loadStatistics(false); // Update stats
+                loadStatistics(false, true); // Update stats - force refresh to get new events
                 updateChartDataSilently(); // Update chart data without animation
             }
         }, 5000);
@@ -230,13 +276,82 @@
         }
     }
 
-    async function loadDataForLocation(locationId: number, isInitialLoad = false, animate = true) {
+    async function loadDataForLocation(locationId: number, isInitialLoad = false, animate = true, useCache = true) {
         try {
-            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
+            // If "all" range is selected and we don't have earliest time yet, fetch it first
+            if (selectedRange === 'all' && !earliestEventTime && USE_REAL_DATA) {
+                // Fetch with fallback range to get all events
+                const fallbackRange = calculateTimeRange('all', undefined);
+                const allEventsResponse = await fetchEventsForLocation(locationId, fallbackRange);
+                if (allEventsResponse.events.length > 0) {
+                    earliestEventTime = findEarliestEventTime(allEventsResponse.events);
+                    console.log(`📅 Found earliest event: ${earliestEventTime?.toISOString()}`);
+                }
+            }
 
-            // Fetch events only once
-            const eventsResponse = await fetchEventsForLocation(locationId, timeRange);
-            const events = eventsResponse.events;
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined, earliestEventTime || undefined);
+            let events: Event[];
+
+            // Check if we can use cached data
+            if (USE_REAL_DATA && useCache && isCacheValid(locationId, timeRange)) {
+                console.log('📦 Using cached events');
+                events = filterCachedEvents(timeRange);
+            } else {
+                // Fetch fresh events from API
+                const eventsResponse = await fetchEventsForLocation(locationId, timeRange);
+                events = eventsResponse.events;
+
+                console.log(`✅ Fetched ${events.length} events from API`);
+
+                // Update cache with the broader time range for future use
+                // For day/week, we fetch and cache a month worth of data
+                // For month, we cache the month
+                // For all time, we cache what we get
+                let cacheTimeRange = timeRange;
+                if (selectedRange === 'day' || selectedRange === 'week') {
+                    // Cache a month's worth of data when viewing day or week
+                    const cacheStart = new Date(timeRange.start);
+                    cacheStart.setDate(1); // Start of month
+                    cacheStart.setHours(0, 0, 0, 0);
+                    const cacheEnd = new Date(cacheStart);
+                    cacheEnd.setMonth(cacheEnd.getMonth() + 1);
+                    cacheEnd.setDate(0); // Last day of month
+                    cacheEnd.setHours(23, 59, 59, 999);
+
+                    // If we're viewing a different range, fetch the broader data
+                    if (cacheStart.getTime() < timeRange.start.getTime() ||
+                        cacheEnd.getTime() > timeRange.end.getTime()) {
+                        const broadResponse = await fetchEventsForLocation(locationId, {
+                            start: cacheStart,
+                            end: cacheEnd
+                        });
+                        eventCache = {
+                            locationId,
+                            events: broadResponse.events,
+                            fetchTime: new Date(),
+                            timeRange: { start: cacheStart, end: cacheEnd }
+                        };
+                        console.log(`📦 Cached ${broadResponse.events.length} events for month range`);
+                        // Filter to requested range
+                        events = filterCachedEvents(timeRange);
+                    } else {
+                        eventCache = {
+                            locationId,
+                            events,
+                            fetchTime: new Date(),
+                            timeRange
+                        };
+                    }
+                } else {
+                    // Cache the exact range for month/all time views
+                    eventCache = {
+                        locationId,
+                        events,
+                        fetchTime: new Date(),
+                        timeRange
+                    };
+                }
+            }
 
             console.log(`✅ Fetched ${events.length} events from API`);
 
@@ -246,17 +361,50 @@
                 console.log("Loaded initial stats from events:", $state.snapshot(newStats));
             }
 
-            const barChartData = createBarChartDataFromEvents(events, timeRange);
             const fullChartData = createChartDataFromEvents(events, timeRange);
             const ppeData = calculatePPEComplianceFromEvents(events);
+
+            // Generate proper labels from timestamps
+            const hoursDiff = Math.floor((timeRange.end.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60));
+            const newChartLabels = fullChartData.persons.map(point => {
+                const date = new Date(point.timestamp);
+
+                if (hoursDiff <= 24) {
+                    // Day view - show hours
+                    return `${date.getHours()}:00`;
+                } else if (hoursDiff <= 168) {
+                    // Week view - show day names with dates
+                    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}`;
+                } else if (hoursDiff <= 720) {
+                    // Month view - show dates
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    return `${months[date.getMonth()]} ${date.getDate()}`;
+                } else {
+                    // All time - show week date ranges
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const weekEnd = new Date(date.getTime() + (6 * 24 * 60 * 60 * 1000)); // Add 6 days
+                    const startMonth = months[date.getMonth()];
+                    const endMonth = months[weekEnd.getMonth()];
+
+                    if (date.getMonth() === weekEnd.getMonth()) {
+                        // Same month: "Oct 1-7"
+                        return `${startMonth} ${date.getDate()}-${weekEnd.getDate()}`;
+                    } else {
+                        // Different months: "Oct 28-Nov 3"
+                        return `${startMonth} ${date.getDate()}-${endMonth} ${weekEnd.getDate()}`;
+                    }
+                }
+            });
 
             // Batch update all state at once using untrack to prevent intermediate renders
             shouldAnimateCharts = animate;
 
             // Update chart data atomically
-            chartLabels = barChartData.labels;
-            personsData = barChartData.persons;
-            vehiclesData = barChartData.vehicles;
+            chartLabels = newChartLabels;
+            personsData = fullChartData.persons.map(point => point.value);
+            vehiclesData = fullChartData.vehicles.map(point => point.value);
             ppeBreachesData = fullChartData.ppeBreaches.map(point => point.value);
             zoneEntriesData = fullChartData.zoneEntries.map(point => point.value);
 
@@ -283,7 +431,7 @@
         }
     }
 
-    async function loadStatistics(isInitialLoad = false) {
+    async function loadStatistics(isInitialLoad = false, forceRefresh = false) {
         if (!config?.locationId) {
             console.log("No location ID available for stats");
             return;
@@ -291,7 +439,7 @@
 
         statsLoading = true;
         try {
-            await loadDataForLocation(config.locationId, isInitialLoad, false);
+            await loadDataForLocation(config.locationId, isInitialLoad, false, !forceRefresh);
         } catch (error) {
             console.error("Error loading statistics:", error);
             statsLoading = false;
@@ -523,7 +671,7 @@
                     </button>
                 {/each}
                 {#if selectedRange === 'custom' && customTimeRange}
-                    <span class="text-sm text-gray-600 ml-2 px-3 py-1 bg-orange-50 rounded-full border border-orange-200">
+                    <span class="flex items-center text-sm text-gray-600 ml-2 px-3 py-1 bg-orange-50 rounded-full border border-orange-200">
                         {customTimeRange.start.toLocaleDateString('sv-SE')} - {customTimeRange.end.toLocaleDateString('sv-SE')}
                     </span>
                 {/if}

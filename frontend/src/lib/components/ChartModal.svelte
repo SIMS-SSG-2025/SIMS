@@ -8,7 +8,9 @@
         getMockChartModalData,
         fetchEventsForLocation,
         createChartDataFromEvents,
-        calculatePPEComplianceFromEvents
+        calculatePPEComplianceFromEvents,
+        findEarliestEventTime,
+        type Event
     } from '$lib/api/stats';
     import { chartPreferences } from '$lib/stores/chartPreferences';
     import DateRangePicker from './DateRangePicker.svelte';
@@ -71,10 +73,55 @@
     let vehiclesData = $state<number[]>([]);
     let ppeBreachesData = $state<number[]>([]);
     let zoneEntriesData = $state<number[]>([]);
+    let earliestEventTime = $state<Date | null>(null); // Store earliest event for "All" time range
 
     let canvasElement: HTMLCanvasElement | undefined;
     let chart: Chart | null = null;
     let loading = $state(false);
+
+    // Event cache to avoid re-fetching data when switching time periods
+    interface EventCache {
+        locationId: number;
+        events: Event[];
+        fetchTime: Date;
+        timeRange: TimeRange;
+    }
+    let eventCache = $state<EventCache | null>(null);
+
+    // Check if cached data is still valid for the requested time range
+    function isCacheValid(locId: number, requestedRange: TimeRange): boolean {
+        if (!eventCache || eventCache.locationId !== locId) {
+            return false;
+        }
+
+        // Check if cached time range covers the requested range
+        const cacheStart = eventCache.timeRange.start.getTime();
+        const cacheEnd = eventCache.timeRange.end.getTime();
+        const requestStart = requestedRange.start.getTime();
+        const requestEnd = requestedRange.end.getTime();
+
+        // Cache is valid if it covers or equals the requested range
+        return cacheStart <= requestStart && cacheEnd >= requestEnd;
+    }
+
+    // Filter cached events to the requested time range
+    function filterCachedEvents(requestedRange: TimeRange): Event[] {
+        if (!eventCache) return [];
+
+        return eventCache.events.filter(event => {
+            const eventTime = new Date(event.time).getTime();
+            return eventTime >= requestedRange.start.getTime() &&
+                   eventTime <= requestedRange.end.getTime();
+        });
+    }
+
+    // Clear cache when location changes
+    $effect(() => {
+        if (locationId !== eventCache?.locationId) {
+            eventCache = null;
+            earliestEventTime = null; // Also clear earliest event time
+        }
+    });
 
     const ranges: { label: string; value: TimeRangeOption }[] = [
         { label: "Day", value: "day" },
@@ -107,7 +154,18 @@
     async function loadChartData() {
         loading = true;
         try {
-            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
+            // If "all" range is selected and we don't have earliest time yet, fetch it first
+            if (selectedRange === 'all' && !earliestEventTime && USE_REAL_DATA && locationId) {
+                // Fetch with fallback range to get all events
+                const fallbackRange = calculateTimeRange('all', undefined);
+                const allEventsResponse = await fetchEventsForLocation(locationId, fallbackRange);
+                if (allEventsResponse.events.length > 0) {
+                    earliestEventTime = findEarliestEventTime(allEventsResponse.events);
+                    console.log(`📅 ChartModal: Found earliest event: ${earliestEventTime?.toISOString()}`);
+                }
+            }
+
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined, earliestEventTime || undefined);
 
             // Create plain objects to avoid Svelte state descriptor issues
             const plainTimeRange = {
@@ -119,13 +177,70 @@
                 // ============================================
                 // REAL DATA FROM API
                 // ============================================
-                const eventsResponse = await fetchEventsForLocation(locationId, plainTimeRange);
-                const events = eventsResponse.events;
+                let events: Event[];
+
+                // Check if we can use cached data
+                if (isCacheValid(locationId, plainTimeRange)) {
+                    console.log('📦 ChartModal: Using cached events');
+                    events = filterCachedEvents(plainTimeRange);
+                } else {
+                    // Fetch fresh events from API
+                    const eventsResponse = await fetchEventsForLocation(locationId, plainTimeRange);
+                    events = eventsResponse.events;
+
+                    console.log(`✅ ChartModal: Fetched ${events.length} events from API`);
+
+                    // Update cache with broader time range for day/week views
+                    let cacheTimeRange = plainTimeRange;
+                    if (selectedRange === 'day' || selectedRange === 'week') {
+                        // Cache a month's worth of data when viewing day or week
+                        const cacheStart = new Date(plainTimeRange.start);
+                        cacheStart.setDate(1); // Start of month
+                        cacheStart.setHours(0, 0, 0, 0);
+                        const cacheEnd = new Date(cacheStart);
+                        cacheEnd.setMonth(cacheEnd.getMonth() + 1);
+                        cacheEnd.setDate(0); // Last day of month
+                        cacheEnd.setHours(23, 59, 59, 999);
+
+                        // If we need to fetch broader data
+                        if (cacheStart.getTime() < plainTimeRange.start.getTime() ||
+                            cacheEnd.getTime() > plainTimeRange.end.getTime()) {
+                            const broadResponse = await fetchEventsForLocation(locationId, {
+                                start: cacheStart,
+                                end: cacheEnd
+                            });
+                            eventCache = {
+                                locationId,
+                                events: broadResponse.events,
+                                fetchTime: new Date(),
+                                timeRange: { start: cacheStart, end: cacheEnd }
+                            };
+                            console.log(`📦 ChartModal: Cached ${broadResponse.events.length} events for month range`);
+                            // Filter to requested range
+                            events = filterCachedEvents(plainTimeRange);
+                        } else {
+                            eventCache = {
+                                locationId,
+                                events,
+                                fetchTime: new Date(),
+                                timeRange: plainTimeRange
+                            };
+                        }
+                    } else {
+                        // Cache the exact range for month/all time views
+                        eventCache = {
+                            locationId,
+                            events,
+                            fetchTime: new Date(),
+                            timeRange: plainTimeRange
+                        };
+                    }
+                }
 
                 // Transform events into chart data
                 const chartData = createChartDataFromEvents(events, plainTimeRange);
 
-                // Convert ChartDataPoint[] to labels and data arrays
+                // Generate proper labels from timestamps
                 const hoursDiff = Math.floor((plainTimeRange.end.getTime() - plainTimeRange.start.getTime()) / (1000 * 60 * 60));
 
                 chartLabels = chartData.persons.map(point => {
@@ -135,15 +250,28 @@
                         // Day view - show hours
                         return `${date.getHours()}:00`;
                     } else if (hoursDiff <= 168) {
-                        // Week view - show day names with date
-                        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                        // Week view - show day names with dates
+                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}`;
                     } else if (hoursDiff <= 720) {
                         // Month view - show dates
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        return `${months[date.getMonth()]} ${date.getDate()}`;
                     } else {
-                        // All time - show weeks
-                        const weekNumber = Math.floor((date.getTime() - plainTimeRange.start.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
-                        return `Week ${weekNumber}`;
+                        // All time - show week date ranges
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const weekEnd = new Date(date.getTime() + (6 * 24 * 60 * 60 * 1000)); // Add 6 days
+                        const startMonth = months[date.getMonth()];
+                        const endMonth = months[weekEnd.getMonth()];
+
+                        if (date.getMonth() === weekEnd.getMonth()) {
+                            // Same month: "Oct 1-7"
+                            return `${startMonth} ${date.getDate()}-${weekEnd.getDate()}`;
+                        } else {
+                            // Different months: "Oct 28-Nov 3"
+                            return `${startMonth} ${date.getDate()}-${endMonth} ${weekEnd.getDate()}`;
+                        }
                     }
                 });
 
