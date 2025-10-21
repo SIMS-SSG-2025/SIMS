@@ -717,7 +717,7 @@
                 <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <p class="text-sm text-blue-800">
                         <strong>Tip:</strong> Use the checkboxes above to show/hide different data series.
-                        Change the time period to view data across different time ranges.
+                        Switch between bar and line chart types using the buttons on the top right.
                     </p>
                 </div>
             </div>
