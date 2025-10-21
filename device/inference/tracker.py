@@ -32,19 +32,26 @@ class ReIDEngine:
         self.model(embed=[-1], imgsz=224)
 
     def __call__(self, img, dets):
-        feats = []
-
         boxes = xywh2xyxy(torch.from_numpy(dets[:, :4]))
+
+        crops = []
         for box in boxes:
             crop = save_one_box(box, img, save=False)
             crop = cv2.resize(crop, (224, 224))
-            preds = self.model.predict(crop, verbose=False, imgsz=224)
+            crops.append(crop)
 
-            feat = preds[0].squeeze(0)
-            if torch.is_tensor(feat):
-                feat = feat.cpu().numpy()
+        batch_size = 8
+        feats = []
 
-            feats.append(np.squeeze(feat))
+        for i in range(0,len(crops),batch_size):
+            batch = crops[i:i+batch_size]
+            preds = self.model.predict(source=batch, verbose=False, imgsz=224)
+            for p in preds[0]:
+                feat = p.squeeze()
+                if torch.is_tensor(feat):
+                    feat = feat.cpu().numpy()
+
+                feats.append(np.squeeze(feat))
 
         return feats
 
