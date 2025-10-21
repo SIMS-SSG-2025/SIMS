@@ -1,5 +1,6 @@
 <script lang="ts">
     import BarChart from "$lib/components/BarChart.svelte";
+    import LineChart from "$lib/components/LineChart.svelte";
     import PieChart from "$lib/components/PieChart.svelte";
     import Modal from "$lib/components/modal.svelte";
     import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
@@ -115,43 +116,54 @@
     // Control whether chart updates should animate
     let shouldAnimateCharts = $state(false);
 
-    // Dynamically build datasets based on checkbox preferences
+    // Dynamically build datasets based on checkbox preferences and chart type
+    // NOTE: Must use structuredClone to break Svelte reactivity and avoid Chart.js conflicts
     let chartDatasets = $derived(() => {
         const datasets = [];
+        const isLine = preferences.chartType === 'line';
+
         if (preferences.showPersons) {
             datasets.push({
                 label: 'Persons',
-                data: personsData,
+                data: [...personsData], // Break reactivity with spread
                 backgroundColor: 'rgba(59, 130, 246, 0.7)',
                 borderColor: 'rgb(59, 130, 246)',
-                borderWidth: 2
+                borderWidth: 2,
+                fill: isLine ? false : true,
+                tension: isLine ? 0.4 : 0
             });
         }
         if (preferences.showVehicles) {
             datasets.push({
                 label: 'Vehicles',
-                data: vehiclesData,
+                data: [...vehiclesData], // Break reactivity with spread
                 backgroundColor: 'rgba(34, 197, 94, 0.7)',
                 borderColor: 'rgb(34, 197, 94)',
-                borderWidth: 2
+                borderWidth: 2,
+                fill: isLine ? false : true,
+                tension: isLine ? 0.4 : 0
             });
         }
         if (preferences.showPPEBreaches) {
             datasets.push({
                 label: 'PPE Breaches',
-                data: ppeBreachesData,
+                data: [...ppeBreachesData], // Break reactivity with spread
                 backgroundColor: 'rgba(251, 146, 60, 0.7)',
                 borderColor: 'rgb(251, 146, 60)',
-                borderWidth: 2
+                borderWidth: 2,
+                fill: isLine ? false : true,
+                tension: isLine ? 0.4 : 0
             });
         }
         if (preferences.showZoneEntries) {
             datasets.push({
                 label: 'Zone Entries',
-                data: zoneEntriesData,
+                data: [...zoneEntriesData], // Break reactivity with spread
                 backgroundColor: 'rgba(239, 68, 68, 0.7)',
                 borderColor: 'rgb(239, 68, 68)',
-                borderWidth: 2
+                borderWidth: 2,
+                fill: isLine ? false : true,
+                tension: isLine ? 0.4 : 0
             });
         }
         return datasets;
@@ -517,7 +529,6 @@
     let showLogModal = $state(false);
     let showDateRangePicker = $state(false);
     let showChartModal = $state(false);
-    let chartModalType = $state<'bar' | 'line'>('bar');
     let chartModalTitle = $state('Chart Details');
 
     function openSettingsModal() {
@@ -560,8 +571,7 @@
         loadStatistics(true);
     }
 
-    function openChartModal(type: 'bar' | 'line', title: string) {
-        chartModalType = type;
+    function openChartModal(title: string) {
         chartModalTitle = title;
         showChartModal = true;
     }
@@ -716,10 +726,10 @@
         <!-- Detection Bar Chart - Persons & Vehicles -->
         <div
             class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
-            onclick={() => openChartModal('bar', 'Detections Over Time')}
+            onclick={() => openChartModal('Detections Over Time')}
             role="button"
             tabindex="0"
-            onkeydown={(e) => e.key === 'Enter' && openChartModal('bar', 'Detections Over Time')}
+            onkeydown={(e) => e.key === 'Enter' && openChartModal('Detections Over Time')}
         >
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-700">Detections Over Time</h3>
@@ -727,11 +737,27 @@
             </div>
             <div class="flex-1">
                 {#if !isChartDataLoading}
-                <BarChart
-                    labels={chartLabels}
-                    datasets={chartDatasets()}
-                    animate={shouldAnimateCharts}
-                />
+                    {#if preferences.chartType === 'bar'}
+                    {#key chartDataVersion}
+                    <BarChart
+                        labels={[...chartLabels]}
+                        datasets={chartDatasets()}
+                        animate={shouldAnimateCharts}
+                    />
+                    {/key}
+                    {:else if preferences.chartType === 'line'}
+                    {#key chartDataVersion}
+                    <LineChart
+                        data={{
+                            labels: [...chartLabels],
+                            datasets: chartDatasets()
+                        }}
+                        animate={shouldAnimateCharts}
+                    />
+                    {/key}
+                    {:else}
+                    <div class="text-gray-400 text-sm">Unknown chart type: {preferences.chartType}</div>
+                    {/if}
                 {:else}
                 <div class="flex items-center justify-center h-full">
                     <div class="text-gray-400">Loading...</div>
@@ -831,7 +857,7 @@
     <ChartModal
         bind:open={showChartModal}
         onClose={closeChartModal}
-        chartType={chartModalType}
+        chartType={preferences.chartType}
         initialTitle={chartModalTitle}
         locationId={config?.locationId}
     />

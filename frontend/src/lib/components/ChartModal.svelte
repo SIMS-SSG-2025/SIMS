@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import { Chart, Title, Tooltip, Legend, BarElement, LineElement, PointElement, CategoryScale, LinearScale, BarController, LineController } from 'chart.js';
-    import { X } from 'lucide-svelte';
+    import { Chart, Title, Tooltip, Legend, BarElement, LineElement, PointElement, CategoryScale, LinearScale, BarController, LineController, Filler } from 'chart.js';
+    import { X, BarChart3, LineChart } from 'lucide-svelte';
     import type { TimeRangeOption, TimeRange } from '$lib/api/stats';
     import {
         calculateTimeRange,
@@ -25,7 +25,8 @@
         Title, Tooltip, Legend,
         BarElement, LineElement, PointElement,
         CategoryScale, LinearScale,
-        BarController, LineController
+        BarController, LineController,
+        Filler
     );
 
     type ChartModalProps = {
@@ -54,6 +55,7 @@
     let showZoneEntries = $state($chartPreferences.showZoneEntries);
     let selectedRange = $state<TimeRangeOption>($chartPreferences.selectedRange);
     let customTimeRange = $state<TimeRange | null>($chartPreferences.customTimeRange);
+    let currentChartType = $state<'bar' | 'line'>($chartPreferences.chartType);
 
     // Sync local state when store changes
     $effect(() => {
@@ -63,9 +65,13 @@
         showZoneEntries = preferences.showZoneEntries;
         selectedRange = preferences.selectedRange;
         customTimeRange = preferences.customTimeRange;
+        currentChartType = preferences.chartType;
     });
 
     let showCustomDatePicker = $state(false);
+
+    // Track previous chart type to detect actual changes
+    let prevChartType = $state<'bar' | 'line' | null>(null);
 
     // Chart data
     let chartLabels = $state<string[]>([]);
@@ -75,7 +81,7 @@
     let zoneEntriesData = $state<number[]>([]);
     let earliestEventTime = $state<Date | null>(null); // Store earliest event for "All" time range
 
-    let canvasElement: HTMLCanvasElement | undefined;
+    let canvasElement = $state<HTMLCanvasElement | undefined>(undefined);
     let chart: Chart | null = null;
     let loading = $state(false);
 
@@ -150,6 +156,16 @@
             border: 'rgb(239, 68, 68)'
         }
     };
+
+    function toggleChartType() {
+        const newType = currentChartType === 'bar' ? 'line' : 'bar';
+
+        // Update global store (this will trigger the sync effect which updates currentChartType)
+        chartPreferences.update(prefs => ({
+            ...prefs,
+            chartType: newType
+        }));
+    }
 
     async function loadChartData() {
         loading = true;
@@ -317,7 +333,7 @@
         if (!canvasElement || chart) return;
 
         chart = new Chart(canvasElement, {
-            type: chartType,
+            type: currentChartType,
             data: {
                 labels: [],
                 datasets: []
@@ -399,10 +415,10 @@
                 backgroundColor: colors.persons.background,
                 borderColor: colors.persons.border,
                 borderWidth: 2,
-                tension: chartType === 'line' ? 0.4 : undefined,
-                fill: chartType === 'line' ? false : undefined,
-                pointRadius: chartType === 'line' ? 4 : undefined,
-                pointHoverRadius: chartType === 'line' ? 6 : undefined
+                tension: currentChartType === 'line' ? 0.4 : undefined,
+                fill: currentChartType === 'line' ? false : undefined,
+                pointRadius: currentChartType === 'line' ? 4 : undefined,
+                pointHoverRadius: currentChartType === 'line' ? 6 : undefined
             });
         }
 
@@ -413,10 +429,10 @@
                 backgroundColor: colors.vehicles.background,
                 borderColor: colors.vehicles.border,
                 borderWidth: 2,
-                tension: chartType === 'line' ? 0.4 : undefined,
-                fill: chartType === 'line' ? false : undefined,
-                pointRadius: chartType === 'line' ? 4 : undefined,
-                pointHoverRadius: chartType === 'line' ? 6 : undefined
+                tension: currentChartType === 'line' ? 0.4 : undefined,
+                fill: currentChartType === 'line' ? false : undefined,
+                pointRadius: currentChartType === 'line' ? 4 : undefined,
+                pointHoverRadius: currentChartType === 'line' ? 6 : undefined
             });
         }
 
@@ -427,10 +443,10 @@
                 backgroundColor: colors.ppeBreaches.background,
                 borderColor: colors.ppeBreaches.border,
                 borderWidth: 2,
-                tension: chartType === 'line' ? 0.4 : undefined,
-                fill: chartType === 'line' ? false : undefined,
-                pointRadius: chartType === 'line' ? 4 : undefined,
-                pointHoverRadius: chartType === 'line' ? 6 : undefined
+                tension: currentChartType === 'line' ? 0.4 : undefined,
+                fill: currentChartType === 'line' ? false : undefined,
+                pointRadius: currentChartType === 'line' ? 4 : undefined,
+                pointHoverRadius: currentChartType === 'line' ? 6 : undefined
             });
         }
 
@@ -441,10 +457,10 @@
                 backgroundColor: colors.zoneEntries.background,
                 borderColor: colors.zoneEntries.border,
                 borderWidth: 2,
-                tension: chartType === 'line' ? 0.4 : undefined,
-                fill: chartType === 'line' ? false : undefined,
-                pointRadius: chartType === 'line' ? 4 : undefined,
-                pointHoverRadius: chartType === 'line' ? 6 : undefined
+                tension: currentChartType === 'line' ? 0.4 : undefined,
+                fill: currentChartType === 'line' ? false : undefined,
+                pointRadius: currentChartType === 'line' ? 4 : undefined,
+                pointHoverRadius: currentChartType === 'line' ? 6 : undefined
             });
         }
 
@@ -477,14 +493,15 @@
     }
 
     function updateStore() {
-        chartPreferences.set({
+        chartPreferences.update(prefs => ({
+            ...prefs,
             selectedRange,
             customTimeRange,
             showPersons,
             showVehicles,
             showPPEBreaches,
             showZoneEntries
-        });
+        }));
     }
 
     function handleClose() {
@@ -492,6 +509,7 @@
             chart.destroy();
             chart = null;
         }
+        prevChartType = null; // Reset tracking when closing
         onClose();
     }
 
@@ -508,8 +526,39 @@
     // Initialize chart when modal opens
     $effect(() => {
         if (open && canvasElement && !chart) {
+            prevChartType = currentChartType; // Track initial type
             initializeChart();
             loadChartData();
+        }
+    });
+
+    // Watch for chart type changes and recreate chart
+    $effect(() => {
+        // Access currentChartType to make this reactive
+        const type = currentChartType;
+
+        // Only recreate if:
+        // 1. Chart exists
+        // 2. Modal is open
+        // 3. We've tracked a previous type
+        // 4. Type actually changed
+        if (chart && open && prevChartType !== null && prevChartType !== type) {
+            console.log(`🔄 ChartModal: Chart type changed from ${prevChartType} to ${type}`);
+            prevChartType = type;
+
+            // Destroy old chart
+            chart.destroy();
+            chart = null;
+
+            // Recreate with new type
+            if (canvasElement) {
+                initializeChart();
+                updateChart();
+            }
+        } else if (!prevChartType && chart) {
+            // Initialize tracking after first chart creation
+            prevChartType = type;
+            console.log(`📊 ChartModal: Initial chart type set to ${type}`);
         }
     });
 
@@ -553,19 +602,43 @@
             <div class="flex-1 overflow-y-auto p-6">
                 <!-- Controls Section -->
                 <div class="mb-6 space-y-4">
-                    <!-- Time Range Selection -->
-                    <div class="flex flex-wrap items-center gap-3">
-                        <span class="text-sm font-semibold text-gray-700">Time Period:</span>
-                        {#each ranges as range}
+                    <!-- Time Range Selection & Chart Type Toggle -->
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <span class="text-sm font-semibold text-gray-700">Time Period:</span>
+                            {#each ranges as range}
+                                <button
+                                    class="px-4 py-2 rounded-lg text-sm font-medium transition {selectedRange === range.value
+                                        ? 'bg-[#E76A23] text-white shadow-md'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+                                    onclick={() => handleTimeRangeChange(range.value)}
+                                >
+                                    {range.label}
+                                </button>
+                            {/each}
+                        </div>
+
+                        <!-- Chart Type Toggle Buttons -->
+                        <div class="flex items-center gap-2">
                             <button
-                                class="px-4 py-2 rounded-lg text-sm font-medium transition {selectedRange === range.value
+                                class="px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1.5 {currentChartType === 'bar'
                                     ? 'bg-[#E76A23] text-white shadow-md'
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-                                onclick={() => handleTimeRangeChange(range.value)}
+                                onclick={() => currentChartType !== 'bar' && toggleChartType()}
+                                title="Bar Chart"
                             >
-                                {range.label}
+                                <BarChart3 size={16} />
                             </button>
-                        {/each}
+                            <button
+                                class="px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1.5 {currentChartType === 'line'
+                                    ? 'bg-[#E76A23] text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+                                onclick={() => currentChartType !== 'line' && toggleChartType()}
+                                title="Line Chart"
+                            >
+                                <LineChart size={16} />
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Data Series Toggles -->

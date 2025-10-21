@@ -8,6 +8,7 @@ export interface ChartPreferences {
     showVehicles: boolean;
     showPPEBreaches: boolean;
     showZoneEntries: boolean;
+    chartType: 'bar' | 'line';
 }
 
 const defaultPreferences: ChartPreferences = {
@@ -16,7 +17,8 @@ const defaultPreferences: ChartPreferences = {
     showPersons: true,
     showVehicles: true,
     showPPEBreaches: true,
-    showZoneEntries: true
+    showZoneEntries: true,
+    chartType: 'bar'
 };
 
 export const chartPreferences = writable<ChartPreferences>(defaultPreferences);

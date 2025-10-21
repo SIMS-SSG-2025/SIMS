@@ -1,51 +1,68 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Chart, Title, Tooltip, Legend, LineElement, PointElement, CategoryScale, LinearScale, LineController } from 'chart.js';
+  import { Chart, Title, Tooltip, Legend, LineElement, PointElement, CategoryScale, LinearScale, LineController, Filler } from 'chart.js';
 
   Chart.register(
     Title, Tooltip, Legend,
     LineElement, PointElement,
-    CategoryScale, LinearScale, LineController
+    CategoryScale, LinearScale, LineController,
+    Filler
   );
 
-  export let data = {
-    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-    datasets: [
-      {
-        label: "Placeholder Data",
-        data: [12, 19, 3, 5, 2, 3],
-        borderColor: "rgb(59, 130, 246)",
-        backgroundColor: "rgba(59, 130, 246, 0.5)",
-        fill: true,
-        tension: 0.4
-      }
-    ]
+  type LineChartProps = {
+    data?: {
+      labels: string[];
+      datasets: {
+        label: string;
+        data: number[];
+        borderColor: string;
+        backgroundColor: string;
+        fill: boolean;
+        tension: number;
+      }[];
+    };
+    animate?: boolean;
+    options?: any;
   };
 
-  export let animate = false;  // Control whether to animate updates
-
-  export let options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: {
-      duration: 750,  // Smooth animation duration in milliseconds
-      easing: 'easeInOutQuart'
+  let {
+    data = {
+      labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+      datasets: [
+        {
+          label: "Placeholder Data",
+          data: [12, 19, 3, 5, 2, 3],
+          borderColor: "rgb(59, 130, 246)",
+          backgroundColor: "rgba(59, 130, 246, 0.5)",
+          fill: true,
+          tension: 0.4
+        }
+      ]
     },
-    plugins: {
-      legend: { position: "top" as const },
-      title: { display: true, text: "Line Chart (Placeholder)" }
-    },
-    scales: {
-      x: {
-        beginAtZero: true
+    animate = false,
+    options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 750,
+        easing: 'easeInOutQuart'
       },
-      y: {
-        beginAtZero: true
+      plugins: {
+        legend: { position: "top" as const },
+        title: { display: true, text: "Line Chart (Placeholder)" }
+      },
+      scales: {
+        x: {
+          beginAtZero: true
+        },
+        y: {
+          beginAtZero: true
+        }
       }
     }
-  };
+  }: LineChartProps = $props();
 
-  let canvasElement: HTMLCanvasElement;
+  let canvasElement = $state<HTMLCanvasElement | undefined>(undefined);
   let chart: Chart | null = null;
 
   onMount(() => {
@@ -53,7 +70,7 @@
 
     chart = new Chart(canvasElement, {
       type: 'line',
-      data,
+      data: $state.snapshot(data),
       options
     });
   });
@@ -65,14 +82,15 @@
     }
   });
 
-  // Optionally, if data or options can change, you can use $: reactive blocks:
-
-  $: if (chart) {
-    chart.data = data;
-    chart.options = options;
-    // Use animation based on the animate prop
-    chart.update(animate ? 'active' : 'none');
-  }
+  // Update chart when data or options change
+  $effect(() => {
+    if (chart) {
+      chart.data = $state.snapshot(data);
+      chart.options = options;
+      // Use animation based on the animate prop
+      chart.update(animate ? 'active' : 'none');
+    }
+  });
 </script>
 
 <div class="h-64 w-full">

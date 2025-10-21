@@ -23,7 +23,7 @@
 
     let { labels, datasets, title = "", animate = false }: BarChartProps = $props();
 
-    let canvasElement: HTMLCanvasElement;
+    let canvasElement = $state<HTMLCanvasElement | undefined>(undefined);
     let chart: Chart | null = null;
 
     onMount(() => {
