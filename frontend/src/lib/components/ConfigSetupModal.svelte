@@ -1,7 +1,7 @@
 <script lang="ts">
     import Modal from "./modal.svelte";
     import ZoneDrawer from "./ZoneDrawer.svelte";
-    import { Check, ChevronRight, Camera, Loader2, MapPin, Eye, Trash2, Plus, ArrowLeft, Save, X, Edit, Image, Info, Map } from 'lucide-svelte';
+    import { Check, ChevronRight, Camera, LoaderCircle, MapPin, Eye, Trash2, Plus, ArrowLeft, Save, X, SquarePen, Image, Info, Map, CircleStop } from 'lucide-svelte';
     import {
         fetchCurrentConfig,
         fetchAllLocations,
@@ -151,7 +151,7 @@
     }
 
     async function removeSelectedLocation(locationId: number) {
-        if (confirm("Are you sure you want to delete this location and all its zones?")) {
+        if (confirm("⚠️ WARNING: This will permanently delete this location, all its zones, and ALL associated data (events, object positions, etc.).\n\nThis action cannot be undone. Are you sure you want to continue?")) {
             const success = await deleteLocationConfig(locationId);
             if (success) {
                 await loadAllLocations();
@@ -163,6 +163,25 @@
                     customSnapshotPath = "";
                     viewMode = "list";
                 }
+            }
+        }
+    }
+
+    async function handleStopSystem() {
+        if (confirm("Stop the monitoring system? You can restart it later from any location.")) {
+            try {
+                startingSystem = true;
+                systemStatusMessage = 'Stopping monitoring system...';
+                await stopSystem();
+                await loadStoredConfig();
+                systemStatusMessage = '';
+                backToList();
+            } catch (error: any) {
+                console.error("Error stopping system:", error);
+                systemStatusMessage = '';
+                alert(`Error stopping system: ${error.message}`);
+            } finally {
+                startingSystem = false;
             }
         }
     }
@@ -486,7 +505,7 @@
                                     class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {#if startingSystem}
-                                        <Loader2 class="w-5 h-5 animate-spin" />
+                                        <LoaderCircle class="w-5 h-5 animate-spin" />
                                         {systemStatusMessage || 'Activating...'}
                                     {:else}
                                         <Check class="w-5 h-5" />
@@ -503,13 +522,31 @@
                                 </svg>
                                 Edit
                             </button>
-                            <button
-                                on:click={() => removeSelectedLocation(selectedLocationId!)}
-                                class="w-full px-4 py-3 border border-red-300 bg-white text-red-700 rounded-lg hover:bg-red-50 transition font-medium flex items-center justify-center gap-2"
-                            >
-                                <Trash2 class="w-5 h-5" />
-                                Delete
-                            </button>
+                            {#if storedConfig && selectedLocationId === storedConfig.locationId}
+                                <!-- Stop button for active location -->
+                                <button
+                                    on:click={handleStopSystem}
+                                    disabled={startingSystem}
+                                    class="w-full px-4 py-3 border border-orange-300 bg-white text-orange-700 rounded-lg hover:bg-orange-50 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {#if startingSystem}
+                                        <LoaderCircle class="w-5 h-5 animate-spin" />
+                                        Stopping...
+                                    {:else}
+                                        <CircleStop class="w-5 h-5" />
+                                        Stop Monitoring
+                                    {/if}
+                                </button>
+                            {:else}
+                                <!-- Delete button for non-active location -->
+                                <button
+                                    on:click={() => removeSelectedLocation(selectedLocationId!)}
+                                    class="w-full px-4 py-3 border border-red-300 bg-white text-red-700 rounded-lg hover:bg-red-50 transition font-medium flex items-center justify-center gap-2"
+                                >
+                                    <Trash2 class="w-5 h-5" />
+                                    Delete Location
+                                </button>
+                            {/if}
                         </div>
                     </div>
 
@@ -687,7 +724,7 @@
                                     class="w-full px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {#if snapshotLoading}
-                                        <Loader2 class="w-4 h-4 mr-2 inline animate-spin" />
+                                        <LoaderCircle class="w-4 h-4 mr-2 inline animate-spin" />
                                         Fetching Snapshot...
                                     {:else}
                                         <Camera class="w-4 h-4 mr-2 inline" />
@@ -848,7 +885,7 @@
                                 class="inline-flex items-center px-6 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {#if startingSystem}
-                                    <Loader2 class="w-4 h-4 mr-2 animate-spin" />
+                                    <LoaderCircle class="w-4 h-4 mr-2 animate-spin" />
                                     {systemStatusMessage || 'Starting...'}
                                 {:else}
                                     <Save class="w-4 h-4 mr-2" />

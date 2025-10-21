@@ -20,6 +20,7 @@
         fetchEventsForLocation,
         calculateStatsFromEvents,
         calculatePPEComplianceFromEvents,
+        createBarChartDataFromEvents,
         createChartDataFromEvents,
         fetchDetectionBarChartData,
         fetchPPEComplianceData,
@@ -28,7 +29,7 @@
     } from "$lib/api/stats";
     import { chartPreferences } from "$lib/stores/chartPreferences";
 
-    import { Settings, Download, PersonStanding, Car, TriangleAlert, Ban, Users, FileText, ZoomIn, Sliders, Camera } from "lucide-svelte";
+    import { Settings, Download, Car, TriangleAlert, Ban, Users, FileText, ZoomIn, SlidersVertical, Camera } from "lucide-svelte";
 
     // ============================================
     // DATA SOURCE CONFIGURATION
@@ -44,17 +45,12 @@
     let selectedRange = $state<TimeRangeOption>('week');
     let customTimeRange = $state<TimeRange | null>(null);
 
-    // Watch for store changes and sync local state
-    $effect(() => {
-        selectedRange = preferences.selectedRange;
-        customTimeRange = preferences.customTimeRange;
-    });
-
     // Track previous time range to detect changes
     let previousRange = $state<TimeRangeOption | null>(null);
     let previousCustomRange = $state<TimeRange | null>(null);
+    let isLoadingTimeRangeChange = $state(false);
 
-    // Only reload data when time range actually changes (not checkboxes)
+    // Watch for store changes and handle time range updates
     $effect(() => {
         const currentRange = preferences.selectedRange;
         const currentCustom = preferences.customTimeRange;
@@ -63,15 +59,30 @@
         if (previousRange === null) {
             previousRange = currentRange;
             previousCustomRange = currentCustom;
+            selectedRange = currentRange;
+            customTimeRange = currentCustom;
             return;
         }
 
         // Only reload if time range changed (not checkbox changes)
         if (previousRange !== currentRange ||
             JSON.stringify(previousCustomRange) !== JSON.stringify(currentCustom)) {
+
+            // Update state first
+            selectedRange = currentRange;
+            customTimeRange = currentCustom;
             previousRange = currentRange;
             previousCustomRange = currentCustom;
-            loadChartData();
+
+            // Set loading flag to prevent chart updates until new data arrives
+            isLoadingTimeRangeChange = true;
+            isChartDataLoading = true;
+
+            // Load new data
+            loadChartData().finally(() => {
+                isLoadingTimeRangeChange = false;
+                isChartDataLoading = false;
+            });
         }
     });
 
@@ -86,7 +97,7 @@
         ppeBreaches: 0,
         helmetBreaches: 0,
         vestBreaches: 0,
-        forbiddenZoneEntries: 0
+        riskZoneEntries: 0
     });
     let statsLoading = $state(false);
 
@@ -96,6 +107,8 @@
     let vehiclesData = $state<number[]>([]);
     let ppeBreachesData = $state<number[]>([]);
     let zoneEntriesData = $state<number[]>([]);
+    let chartDataVersion = $state(0); // Increment this to force chart re-render
+    let isChartDataLoading = $state(false); // Prevent updates during loading
 
     // Control whether chart updates should animate
     let shouldAnimateCharts = $state(false);
@@ -164,20 +177,22 @@
 
     let lastFetchTime = $state<Date | null>(null);
     let pollingInterval: any;
+    let isInitialLoadComplete = $state(false);
 
     onMount(() => {
         interval = setInterval(() => {
             now = new Date();
         }, 1000);
 
-        loadConfiguration();
-        loadStatistics(true); // Initial load
-        loadChartData(); // Initial chart load
+        // Start with initial data load
+        initialLoad();
 
-        // Start polling every 5 seconds
+        // Start polling every 5 seconds after initial load
         pollingInterval = setInterval(() => {
-            loadStatistics(false); // Update stats
-            updateChartDataSilently(); // Update chart data without animation
+            if (isInitialLoadComplete) {
+                loadStatistics(false); // Update stats
+                updateChartDataSilently(); // Update chart data without animation
+            }
         }, 5000);
 
         return () => {
@@ -186,71 +201,99 @@
         };
     });
 
-    async function loadConfiguration() {
-        configLoading = true;
+    async function initialLoad() {
         try {
+            configLoading = true;
+            statsLoading = true;
+
+            // Load configuration first
             config = await fetchCurrentConfig();
             console.log("Loaded config:", $state.snapshot(config));
-
-            // Reload statistics and charts once config is available (we need location ID for real data)
-            if (config && config.locationId) {
-                await loadStatistics(true);
-                await loadChartData();
-            }
-        } catch (error) {
-            console.error("Error loading configuration:", error);
-            config = null;
-        } finally {
             configLoading = false;
+
+            // If we have a location ID, fetch all data in one go
+            if (config && config.locationId) {
+                await loadDataForLocation(config.locationId, true);
+            } else {
+                // No config - just load mock/empty data
+                statsLoading = false;
+                loadChartData(); // Will use mock data
+            }
+
+            isInitialLoadComplete = true;
+        } catch (error) {
+            console.error("Error during initial load:", error);
+            config = null;
+            configLoading = false;
+            statsLoading = false;
+            isInitialLoadComplete = true;
+        }
+    }
+
+    async function loadDataForLocation(locationId: number, isInitialLoad = false, animate = true) {
+        try {
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
+
+            // Fetch events only once
+            const eventsResponse = await fetchEventsForLocation(locationId, timeRange);
+            const events = eventsResponse.events;
+
+            console.log(`✅ Fetched ${events.length} events from API`);
+
+            // Calculate all data transformations first (without updating state)
+            const newStats = calculateStatsFromEvents(events);
+            if (isInitialLoad) {
+                console.log("Loaded initial stats from events:", $state.snapshot(newStats));
+            }
+
+            const barChartData = createBarChartDataFromEvents(events, timeRange);
+            const fullChartData = createChartDataFromEvents(events, timeRange);
+            const ppeData = calculatePPEComplianceFromEvents(events);
+
+            // Batch update all state at once using untrack to prevent intermediate renders
+            shouldAnimateCharts = animate;
+
+            // Update chart data atomically
+            chartLabels = barChartData.labels;
+            personsData = barChartData.persons;
+            vehiclesData = barChartData.vehicles;
+            ppeBreachesData = fullChartData.ppeBreaches.map(point => point.value);
+            zoneEntriesData = fullChartData.zoneEntries.map(point => point.value);
+
+            // Update other data
+            stats = newStats;
+            ppeComplianceData = ppeData; // Always update pie chart data
+
+            // Increment version to signal complete data update
+            chartDataVersion++;
+
+            lastFetchTime = new Date();
+            statsLoading = false;
+        } catch (error) {
+            console.error("Error loading data:", error);
+            stats = {
+                detectedPersons: 0,
+                detectedVehicles: 0,
+                ppeBreaches: 0,
+                helmetBreaches: 0,
+                vestBreaches: 0,
+                riskZoneEntries: 0
+            };
+            statsLoading = false;
         }
     }
 
     async function loadStatistics(isInitialLoad = false) {
+        if (!config?.locationId) {
+            console.log("No location ID available for stats");
+            return;
+        }
+
         statsLoading = true;
         try {
-            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
-
-            if (config && config.locationId) {
-                try {
-                    // Always fetch events for the selected time range
-                    // This ensures stats are accurate for the current view
-                    const response = await fetchEventsForLocation(config.locationId, timeRange);
-
-                    // Calculate stats from all events in time range
-                    stats = calculateStatsFromEvents(response.events);
-
-                    if (isInitialLoad) {
-                        console.log("Loaded initial stats from events:", $state.snapshot(stats));
-                        // Load chart data on initial load
-                        await loadChartData();
-
-                        // Load PPE compliance data
-                        const ppeData = await fetchPPEComplianceData();
-                        ppeComplianceData = ppeData;
-                    } else {
-                        console.log(`Polling update: ${response.count} events in time range`);
-                    }
-
-                    lastFetchTime = new Date();
-                } catch (error) {
-                    console.error("Error fetching events for stats:", error);
-                    // Fallback to zeros on error
-                    stats = {
-                        detectedPersons: 0,
-                        detectedVehicles: 0,
-                        ppeBreaches: 0,
-                        helmetBreaches: 0,
-                        vestBreaches: 0,
-                        forbiddenZoneEntries: 0
-                    };
-                }
-            } else if (isInitialLoad) {
-                // No config but initial load - load chart data
-                loadChartData();
-            }
+            await loadDataForLocation(config.locationId, isInitialLoad, false);
         } catch (error) {
             console.error("Error loading statistics:", error);
-        } finally {
             statsLoading = false;
         }
     }
@@ -260,65 +303,9 @@
             // Enable animations for intentional loads (initial/time period change)
             shouldAnimateCharts = true;
 
-            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
-
-            // Debug: Log data source decision
-            console.log('loadChartData - Data Source Check:', {
-                USE_REAL_DATA,
-                hasConfig: !!config,
-                locationId: config?.locationId,
-                willUseRealData: USE_REAL_DATA && !!config?.locationId
-            });
-
             if (USE_REAL_DATA && config?.locationId) {
-                // ============================================
-                // REAL DATA FROM API
-                // ============================================
-                console.log('📊 Loading REAL data from API...');
-
-                // Fetch events from the API
-                const eventsResponse = await fetchEventsForLocation(config.locationId, timeRange);
-                const events = eventsResponse.events;
-
-                console.log(`✅ Fetched ${events.length} events from API`);
-
-                // Transform events into chart data
-                const chartData = createChartDataFromEvents(events, timeRange);
-
-                // Convert ChartDataPoint[] to labels and data arrays for the bar chart
-                chartLabels = chartData.persons.map(point => {
-                    const date = new Date(point.timestamp);
-                    const hoursDiff = Math.floor((timeRange.end.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60));
-
-                    if (hoursDiff <= 24) {
-                        // Day view - show hours
-                        return `${date.getHours()}:00`;
-                    } else if (hoursDiff <= 168) {
-                        // Week view - show day names
-                        return date.toLocaleDateString('en-US', { weekday: 'short' });
-                    } else if (hoursDiff <= 720) {
-                        // Month view - show dates
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    } else {
-                        // All time - show weeks
-                        const weekNumber = Math.floor((date.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
-                        return `Week ${weekNumber}`;
-                    }
-                });
-
-                personsData = chartData.persons.map(point => point.value);
-                vehiclesData = chartData.vehicles.map(point => point.value);
-                ppeBreachesData = chartData.ppeBreaches.map(point => point.value);
-                zoneEntriesData = chartData.zoneEntries.map(point => point.value);
-
-                // Calculate PPE compliance data from events
-                const ppeData = calculatePPEComplianceFromEvents(events);
-                ppeComplianceData = preferences.showPPEBreaches ? ppeData : {
-                    compliant: 0,
-                    missingHardHat: 0,
-                    missingVest: 0,
-                    missingBoth: 0
-                };
+                // Use the shared data loading function
+                await loadDataForLocation(config.locationId, false, true);
             } else {
                 // ============================================
                 // MOCK DATA (Fallback or when USE_REAL_DATA = false)
@@ -330,6 +317,7 @@
                             'Unknown'
                 });
 
+                const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
                 const mockData = getMockChartModalData(timeRange);
                 const ppeData = await fetchPPEComplianceData();
 
@@ -340,13 +328,11 @@
                 ppeBreachesData = mockData.ppeBreaches;
                 zoneEntriesData = mockData.zoneEntries;
 
-                // PPE compliance data (pie chart)
-                ppeComplianceData = preferences.showPPEBreaches ? ppeData : {
-                    compliant: 0,
-                    missingHardHat: 0,
-                    missingVest: 0,
-                    missingBoth: 0
-                };
+                // PPE compliance data (pie chart) - always show
+                ppeComplianceData = ppeData;
+
+                // Increment version to signal complete data update
+                chartDataVersion++;
             }
         } catch (error) {
             console.error("Error loading chart data:", error);
@@ -363,53 +349,14 @@
 
     // Silent update for polling - updates data without triggering chart reinit/animation
     async function updateChartDataSilently() {
+        if (!config?.locationId) {
+            return;
+        }
+
         try {
             // Disable animations for polling updates
             shouldAnimateCharts = false;
-
-            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
-
-            if (USE_REAL_DATA && config?.locationId) {
-                // Fetch events from the API
-                const eventsResponse = await fetchEventsForLocation(config.locationId, timeRange);
-                const events = eventsResponse.events;
-
-                // Transform events into chart data
-                const chartData = createChartDataFromEvents(events, timeRange);
-
-                // Silently update the data arrays (charts will react)
-                const hoursDiff = Math.floor((timeRange.end.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60));
-
-                chartLabels = chartData.persons.map(point => {
-                    const date = new Date(point.timestamp);
-
-                    if (hoursDiff <= 24) {
-                        return `${date.getHours()}:00`;
-                    } else if (hoursDiff <= 168) {
-                        return date.toLocaleDateString('en-US', { weekday: 'short' });
-                    } else if (hoursDiff <= 720) {
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    } else {
-                        const weekNumber = Math.floor((date.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
-                        return `Week ${weekNumber}`;
-                    }
-                });
-
-                personsData = chartData.persons.map(point => point.value);
-                vehiclesData = chartData.vehicles.map(point => point.value);
-                ppeBreachesData = chartData.ppeBreaches.map(point => point.value);
-                zoneEntriesData = chartData.zoneEntries.map(point => point.value);
-
-                // Update PPE compliance data
-                const ppeData = calculatePPEComplianceFromEvents(events);
-                ppeComplianceData = preferences.showPPEBreaches ? ppeData : {
-                    compliant: 0,
-                    missingHardHat: 0,
-                    missingVest: 0,
-                    missingBoth: 0
-                };
-            }
-            // If not using real data or no config, don't update (keep current data)
+            await loadDataForLocation(config.locationId, false, false);
         } catch (error) {
             console.error("Error updating chart data:", error);
             // On error, keep existing data
@@ -436,11 +383,8 @@
     }
     function closeConfigModal() {
         showConfigModal = false;
-        // Reload configuration after modal closes to reflect any changes
-        loadConfiguration();
-        // Reload stats with new config (reset for full load)
-        lastFetchTime = null;
-        loadStatistics(true);
+        // Reload configuration and data after modal closes to reflect any changes
+        initialLoad();
     }
     function openLogModal() {
         showLogModal = true;
@@ -612,8 +556,8 @@
         />
 
         <StatCard
-            title="Forbidden Zone Entries"
-            value={stats.forbiddenZoneEntries}
+            title="Risk Zone Entries"
+            value={stats.riskZoneEntries}
             iconColor="text-red-600"
             icon={Ban}
         />
@@ -634,11 +578,17 @@
                 <ZoomIn class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23] transition-colors" />
             </div>
             <div class="flex-1">
+                {#if !isChartDataLoading}
                 <BarChart
                     labels={chartLabels}
                     datasets={chartDatasets()}
                     animate={shouldAnimateCharts}
                 />
+                {:else}
+                <div class="flex items-center justify-center h-full">
+                    <div class="text-gray-400">Loading...</div>
+                </div>
+                {/if}
             </div>
             <p class="text-xs text-gray-500 text-center mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 Click to expand and customize
@@ -682,7 +632,7 @@
                     onclick={openConfigModal}
                     aria-label="Setup Configuration"
                 >
-                    <Sliders class="h-5 w-5" />
+                    <SlidersVertical class="h-5 w-5" />
                     Setup Configuration
                 </button>
             </div>
@@ -690,9 +640,9 @@
             <!-- Snapshot with Zones -->
             <div class="bg-white rounded-2xl shadow p-6">
                 <h3 class="text-lg font-semibold text-gray-700 mb-4">Camera View with Zones</h3>
-                <div class="p-6 flex items-center justify-center bg-gray-100 rounded-lg overflow-hidden" style="height: 600px;">
+                <div class="p-4 flex items-center justify-center bg-gray-100 rounded-lg">
                     {#if config && config.snapshotPath}
-                        <div class="w-full max-w-2xl max-h-full">
+                        <div class="w-full max-w-4xl max-h-full">
                             <ZoneDrawer
                                 zones={normalizeZones(config.zones || [], 1920, 1080)}
                                 imageSrc={config.snapshotPath}

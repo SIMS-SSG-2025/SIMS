@@ -175,7 +175,7 @@
 			/>
 			<StatCard
 				title="Zone Entries"
-				value={stats.forbiddenZoneEntries}
+				value={stats.riskZoneEntries}
 				icon="map-pin"
 				iconColor="text-red-600"
 			/>

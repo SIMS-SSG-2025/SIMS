@@ -7,7 +7,7 @@ export interface DashboardStats {
     ppeBreaches: number;
     helmetBreaches: number;
     vestBreaches: number;
-    forbiddenZoneEntries: number;
+    riskZoneEntries: number;
 }
 
 export interface Event {
@@ -112,7 +112,7 @@ export function getMockStats(timeRange: TimeRange): DashboardStats {
         ppeBreaches: Math.floor(Math.random() * 50) + 5,
         helmetBreaches: Math.floor(Math.random() * 30) + 3,
         vestBreaches: Math.floor(Math.random() * 25) + 2,
-        forbiddenZoneEntries: Math.floor(Math.random() * 30) + 2
+        riskZoneEntries: Math.floor(Math.random() * 30) + 2
     };
 }
 
@@ -392,7 +392,7 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
     let ppeBreaches = 0;
     let helmetBreaches = 0;
     let vestBreaches = 0;
-    let forbiddenZoneEntries = 0;
+    let riskZoneEntries = 0;
 
     // Track unique objects to avoid counting duplicates
     const uniquePersons = new Set<number>();
@@ -423,10 +423,10 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
             vestBreaches++;
         }
 
-        // Count forbidden zone entries (this assumes all events are zone entries)
+        // Count risk zone entries (this assumes all events are zone entries)
         // You might want to add a flag in your Event type to distinguish entry types
         if (event.zone_id != null) {
-            forbiddenZoneEntries++;
+            riskZoneEntries++;
         }
     });
 
@@ -440,7 +440,7 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
         ppeBreaches,
         helmetBreaches,
         vestBreaches,
-        forbiddenZoneEntries
+        riskZoneEntries: riskZoneEntries
     };
 }
 
@@ -508,23 +508,40 @@ export function createBarChartDataFromEvents(
             vehicles.push(0); // Adjust based on your data
         }
     } else if (hoursDiff <= 168) {
-        // Week view - daily data
+        // Week view - daily data (Monday to Sunday) with actual dates
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const dayCounts = new Array(7).fill(0);
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const numDays = 7;
+        const dayCounts = new Array(numDays).fill(0);
+
+        // Start from the beginning of the time range (should be Monday)
+        const startDate = new Date(timeRange.start);
+
+        // Create a map to track counts for each specific date
+        const dateCountMap = new Map<string, number>();
 
         events.forEach(event => {
             const eventDate = new Date(event.time);
-            const dayOfWeek = eventDate.getDay();
-            dayCounts[dayOfWeek]++;
+            // Calculate which day index (0-6) this event belongs to
+            const dayDiff = Math.floor((eventDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            if (dayDiff >= 0 && dayDiff < numDays) {
+                dayCounts[dayDiff]++;
+            }
         });
 
-        for (let i = 0; i < 7; i++) {
-            labels.push(days[i]);
+        // Generate labels with day names and dates
+        for (let i = 0; i < numDays; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+            const dayName = days[date.getDay()];
+            const monthName = months[date.getMonth()];
+            labels.push(`${dayName} ${monthName} ${date.getDate()}`);
             persons.push(dayCounts[i]);
             vehicles.push(0);
         }
     } else if (hoursDiff <= 720) {
-        // Month view - daily data
+        // Month view - daily data with formatted dates
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const numDays = Math.ceil(hoursDiff / 24);
         const dayCounts = new Array(numDays).fill(0);
 
@@ -539,7 +556,8 @@ export function createBarChartDataFromEvents(
         for (let i = 0; i < numDays; i++) {
             const date = new Date(timeRange.start);
             date.setDate(date.getDate() + i);
-            labels.push(`${date.getMonth() + 1}/${date.getDate()}`);
+            const monthName = months[date.getMonth()];
+            labels.push(`${monthName} ${date.getDate()}`);
             persons.push(dayCounts[i]);
             vehicles.push(0);
         }
@@ -590,27 +608,33 @@ export function createChartDataFromEvents(
         const intervalEnd = new Date(timeRange.start.getTime() + ((i + 1) * intervalMs));
 
         // Count events in this interval
-        let personCount = 0;
-        let vehicleCount = 0;
-        let breachCount = 0;
+        const uniquePersonsInInterval = new Set<number>();
+        const uniqueVehiclesInInterval = new Set<number>();
+        const uniquePPEBreachesInInterval = new Set<number>();
         let entryCount = 0;
 
         events.forEach(event => {
             const eventTime = new Date(event.time).getTime();
             if (eventTime >= intervalStart.getTime() && eventTime < intervalEnd.getTime()) {
-                personCount++;
-                entryCount++;
+                // Track unique persons
+                uniquePersonsInInterval.add(event.object_id);
 
+                // Count zone entries only when zone_id is not null
+                if (event.zone_id != null) {
+                    entryCount++;
+                }
+
+                // Track unique persons with PPE breaches (one breach per person)
                 if (!event.has_helmet || !event.has_vest) {
-                    breachCount++;
+                    uniquePPEBreachesInInterval.add(event.object_id);
                 }
             }
         });
 
         const timestamp = intervalStart.toISOString();
-        persons.push({ timestamp, value: personCount });
-        vehicles.push({ timestamp, value: vehicleCount });
-        ppeBreaches.push({ timestamp, value: breachCount });
+        persons.push({ timestamp, value: uniquePersonsInInterval.size });
+        vehicles.push({ timestamp, value: uniqueVehiclesInInterval.size });
+        ppeBreaches.push({ timestamp, value: uniquePPEBreachesInInterval.size });
         zoneEntries.push({ timestamp, value: entryCount });
     }
 
