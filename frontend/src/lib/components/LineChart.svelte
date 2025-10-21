@@ -49,7 +49,6 @@
       },
       plugins: {
         legend: { position: "top" as const },
-        title: { display: true, text: "Line Chart (Placeholder)" }
       },
       scales: {
         x: {

@@ -37,7 +37,7 @@
     // DATA SOURCE CONFIGURATION
     // ============================================
     // Set this to false to use mock data for charts
-    const USE_REAL_DATA = true;
+    const USE_REAL_DATA = false;
 
     let now = $state(new Date());
     let interval: any;
@@ -245,9 +245,9 @@
         // Start with initial data load
         initialLoad();
 
-        // Start polling every 5 seconds after initial load
+        // Start polling every 5 seconds after initial load (only for real data)
         pollingInterval = setInterval(() => {
-            if (isInitialLoadComplete) {
+            if (isInitialLoadComplete && USE_REAL_DATA) {
                 loadStatistics(false, true); // Update stats - force refresh to get new events
                 updateChartDataSilently(); // Update chart data without animation
             }
@@ -290,6 +290,38 @@
 
     async function loadDataForLocation(locationId: number, isInitialLoad = false, animate = true, useCache = true) {
         try {
+            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined, earliestEventTime || undefined);
+
+            // Check if we should use mock data
+            if (!USE_REAL_DATA) {
+                console.log('🎭 Loading MOCK data in loadDataForLocation...');
+                const mockData = getMockChartModalData(timeRange);
+                const ppeData = await fetchPPEComplianceData();
+
+                // Generate mock stats from the mock data
+                const mockStats = {
+                    detectedPersons: Math.floor(Math.random() * 100) + 50,
+                    detectedVehicles: Math.floor(Math.random() * 50) + 20,
+                    ppeBreaches: Math.floor(Math.random() * 30) + 10,
+                    helmetBreaches: Math.floor(Math.random() * 20) + 5,
+                    vestBreaches: Math.floor(Math.random() * 20) + 5,
+                    riskZoneEntries: Math.floor(Math.random() * 40) + 15
+                };
+
+                shouldAnimateCharts = animate;
+                chartLabels = mockData.labels;
+                personsData = mockData.persons;
+                vehiclesData = mockData.vehicles;
+                ppeBreachesData = mockData.ppeBreaches;
+                zoneEntriesData = mockData.zoneEntries;
+                stats = mockStats;
+                ppeComplianceData = ppeData;
+                chartDataVersion++;
+                lastFetchTime = new Date();
+                statsLoading = false;
+                return;
+            }
+
             // If "all" range is selected and we don't have earliest time yet, fetch it first
             if (selectedRange === 'all' && !earliestEventTime && USE_REAL_DATA) {
                 // Fetch with fallback range to get all events
@@ -301,7 +333,6 @@
                 }
             }
 
-            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined, earliestEventTime || undefined);
             let events: Event[];
 
             // Check if we can use cached data
@@ -444,6 +475,11 @@
     }
 
     async function loadStatistics(isInitialLoad = false, forceRefresh = false) {
+        // Skip polling if using mock data
+        if (!USE_REAL_DATA) {
+            return;
+        }
+
         if (!config?.locationId) {
             console.log("No location ID available for stats");
             return;
@@ -509,6 +545,11 @@
 
     // Silent update for polling - updates data without triggering chart reinit/animation
     async function updateChartDataSilently() {
+        // Skip polling if using mock data
+        if (!USE_REAL_DATA) {
+            return;
+        }
+
         if (!config?.locationId) {
             return;
         }

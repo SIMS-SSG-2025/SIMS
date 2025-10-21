@@ -19,7 +19,7 @@
     // DATA SOURCE CONFIGURATION
     // ============================================
     // Set this to false to use mock data for charts
-    const USE_REAL_DATA = true;
+    const USE_REAL_DATA = false;
 
     Chart.register(
         Title, Tooltip, Legend,
