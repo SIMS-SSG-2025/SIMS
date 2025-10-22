@@ -474,7 +474,7 @@
                             >
                                 <div class="flex items-center justify-center gap-2">
                                     <Plus class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23]" />
-                                    <span class="text-sm font-medium text-gray-600 group-hover:text-[#E76A23]">Create New Location</span>
+                                    <span class="text-sm font-medium text-gray-600 group-hover:text-[#E76A23]">Create New Configuration</span>
                                 </div>
                             </button>
                         {/if}

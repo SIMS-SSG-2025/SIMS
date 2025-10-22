@@ -63,7 +63,7 @@
         {:else}
             <div class="text-center py-8 text-gray-400">
                 <Ban class="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No zones defined</p>
+                <p>No zone entries</p>
             </div>
         {/if}
     </div>

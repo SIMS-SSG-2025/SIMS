@@ -727,7 +727,7 @@
                     aria-label="Setup Configuration"
                 >
                     <SlidersVertical class="h-4 w-4 lg:h-5 lg:w-5" />
-                    Setup
+                    Setup Configuration
                 </button>
             {:else}
                 <!-- Show running config status -->
