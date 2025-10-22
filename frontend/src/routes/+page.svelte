@@ -653,12 +653,12 @@
 
 </script>
 
-<header class="w-full bg-gray-50 py-12">
-    <div class="max-w-7xl mx-auto px-8 flex items-center justify-between">
+<header class="w-full bg-gray-50 py-6 lg:py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <!-- Left: Tab Navigation -->
-        <div class="flex gap-2 bg-white p-1 rounded-lg shadow-sm">
+        <div class="flex gap-1 lg:gap-2 bg-white p-1 rounded-lg shadow-sm">
             <button
-                class="px-6 py-2 rounded-md font-semibold transition
+                class="px-4 lg:px-6 py-1.5 lg:py-2 rounded-md font-semibold transition text-sm lg:text-base
                     {activeTab === 'dashboard'
                         ? 'bg-[#E76A23] text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-50'}"
@@ -667,7 +667,7 @@
                 Dashboard
             </button>
             <button
-                class="px-6 py-2 rounded-md font-semibold transition
+                class="px-4 lg:px-6 py-1.5 lg:py-2 rounded-md font-semibold transition text-sm lg:text-base
                     {activeTab === 'area'
                         ? 'bg-[#E76A23] text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-50'}"
@@ -678,12 +678,12 @@
         </div>
 
         <!-- Right: Settings -->
-        <div class="flex items-center gap-2">
-            <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
-                <Download size={24} class="text-gray-600" />
+        <div class="flex items-center gap-1 lg:gap-2">
+            <button class="p-1.5 lg:p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
+                <Download size={20} class="lg:w-6 lg:h-6 text-gray-600" />
             </button>
-            <button class="p-2 rounded-full hover:bg-gray-100 transition" aria-label="Settings" onclick={openSettingsModal}>
-                <Settings size={24} class="text-gray-600" />
+            <button class="p-1.5 lg:p-2 rounded-full hover:bg-gray-100 transition" aria-label="Settings" onclick={openSettingsModal}>
+                <Settings size={20} class="lg:w-6 lg:h-6 text-gray-600" />
             </button>
         </div>
     </div>
@@ -708,11 +708,11 @@
 <main class="bg-gray-50 min-h-screen">
     {#if activeTab === 'dashboard'}
         <!-- Time Range Selector (below header, only for dashboard) -->
-        <div>
-            <div class="max-w-7xl mx-auto px-8 flex gap-2">
+        <div class="py-2 lg:py-3">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap gap-2">
                 {#each ranges as r}
                     <button
-                        class="px-4 py-2 rounded-lg font-semibold transition text-sm
+                        class="px-3 lg:px-4 py-1.5 lg:py-2 rounded-lg font-semibold transition text-xs lg:text-sm
                             {selectedRange === r.value
                                 ? 'bg-[#E76A23] text-white'
                                 : 'bg-white text-gray-700 hover:bg-orange-50 border border-gray-200'}"
@@ -722,7 +722,7 @@
                     </button>
                 {/each}
                 {#if selectedRange === 'custom' && customTimeRange}
-                    <span class="flex items-center text-sm text-gray-600 ml-2 px-3 py-1 bg-orange-50 rounded-full border border-orange-200">
+                    <span class="flex items-center text-xs lg:text-sm text-gray-600 ml-2 px-2 lg:px-3 py-1 bg-orange-50 rounded-full border border-orange-200">
                         {customTimeRange.start.toLocaleDateString('sv-SE')} - {customTimeRange.end.toLocaleDateString('sv-SE')}
                     </span>
                 {/if}
@@ -730,9 +730,9 @@
         </div>
 
         <!-- Dashboard Content -->
-        <div class="px-8 py-8 max-w-7xl mx-auto">
+        <div class="px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-7xl mx-auto">
             <!-- Cards Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-4 lg:mb-6">
         <StatCard
             title="Detected Persons"
             value={stats.detectedPersons}
@@ -763,10 +763,10 @@
     </div>
 
     <!-- Charts Row (2 charts only) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         <!-- Detection Bar Chart - Persons & Vehicles -->
         <div
-            class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
+            class="bg-white rounded-2xl shadow p-4 lg:p-6 min-h-[320px] lg:min-h-[350px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
             onclick={() => openChartModal('Detections Over Time')}
             role="button"
             tabindex="0"
@@ -811,7 +811,7 @@
         </div>
 
         <!-- PPE Compliance Pie Chart -->
-        <div class="bg-white rounded-2xl shadow p-6 min-h-[400px] flex flex-col">
+        <div class="bg-white rounded-2xl shadow p-4 lg:p-6 min-h-[320px] lg:min-h-[350px] flex flex-col">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-700">PPE Compliance Breakdown</h3>
             </div>
@@ -839,7 +839,7 @@
         </div>
     {:else if activeTab === 'area'}
         <!-- Area Management Content -->
-        <div class="px-8 max-w-7xl mx-auto">
+        <div class="px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-7xl mx-auto">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">Area Management</h2>
                 <button

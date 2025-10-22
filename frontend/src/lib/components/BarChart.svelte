@@ -94,6 +94,6 @@
     });
 </script>
 
-<div class="w-full h-full min-h-[300px]">
+<div class="w-full h-full min-h-[250px] lg:min-h-[280px]">
     <canvas bind:this={canvasElement}></canvas>
 </div>
