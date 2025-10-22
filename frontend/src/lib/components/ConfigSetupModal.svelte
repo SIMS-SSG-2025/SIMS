@@ -25,6 +25,8 @@
     let currentStep = 1;
     let locationName = "";
     let zones: Zone[] = [];
+    let tempZoneNames: Record<number, string> = {}; // Temporary storage for zone names being edited
+    let zoneNameInputs: Record<number, HTMLInputElement> = {}; // References to zone name input elements
 
     // Stored configuration state
     let storedConfig: Config | null = null;
@@ -255,6 +257,14 @@
 
     function handleFinishZone(points: { x: number; y: number }[], name: string) {
         zones = [...zones, { points, name }];
+        // Focus on the name input for the newly added zone
+        // Use setTimeout to ensure DOM has updated
+        setTimeout(() => {
+            const newZoneIndex = zones.length - 1;
+            if (zoneNameInputs[newZoneIndex]) {
+                zoneNameInputs[newZoneIndex].focus();
+            }
+        }, 0);
     }
 
     function resetConfig() {
@@ -325,11 +335,13 @@
 
     $: canProceedStep1 = locationName.trim().length > 0;
     $: canProceedStep2 = customSnapshotPath.trim().length > 0;
-    $: canProceedStep3 = true; // Can proceed even without zones
+    $: canProceedStep3 = zones.length === 0 || zones.every(zone => zone.name && zone.name.trim().length > 0); // All zones must have names
+    $: unnamedZonesCount = zones.filter(zone => !zone.name || zone.name.trim().length === 0).length;
+    $: modalWidth = currentStep === 3 ? 'max-w-7xl' : 'max-w-4xl'; // Larger width for zone drawing step
 
 </script>
 
-<Modal {open} onClose={handleClose} modalClass="p-0 w-full max-w-4xl max-h-[90vh] flex flex-col">
+<Modal {open} onClose={handleClose} modalClass="p-0 w-full {modalWidth} max-h-[90vh] flex flex-col">
     <div class="w-full flex flex-col h-full min-h-0">
         <!-- Header with Steps - only show during setup flow -->
         {#if (showNewLocationForm || isEditingExisting) && viewMode === "edit"}
@@ -341,7 +353,7 @@
                 {#each steps as step, index}
                     <div class="flex items-center">
                         <button
-                            class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-colors
+                            class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-colors flex-shrink-0
                                 {currentStep === step.id
                                     ? 'bg-[#E76A23] text-white'
                                     : currentStep > step.id
@@ -361,7 +373,7 @@
                             <p class="text-xs text-gray-500">{step.description}</p>
                         </div>
                         {#if index < steps.length - 1}
-                            <div class="w-12 h-px bg-gray-300 mx-4"></div>
+                            <div class="w-12 h-px bg-gray-300 mx-4 flex-shrink-0"></div>
                         {/if}
                     </div>
                 {/each}
@@ -791,17 +803,18 @@
             {:else if currentStep === 3}
                 <!-- Step 3: Zone Setup -->
                 <div class="flex-1 overflow-y-auto px-6 py-6">
-                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                        <!-- Left: Zone Drawing Area (Larger) -->
-                        <div class="lg:col-span-3">
-                            <div class="border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
+                    <div class="flex gap-6 h-full">
+                        <!-- Left: Zone Drawing Area (Much Larger) -->
+                        <div class="flex-1">
+                            <div class="border border-gray-300 rounded-lg overflow-hidden bg-gray-50 h-full">
                                 {#if customSnapshotPath}
                                     <ZoneDrawer
                                         onFinishZone={handleFinishZone}
-                                        width={1400}
-                                        height={787}
+                                        width={1600}
+                                        height={900}
                                         bind:zones={zones}
                                         imageSrc={customSnapshotPath}
+                                        hideControls={true}
                                     />
                                 {:else}
                                     <div class="flex items-center justify-center h-96 text-center">
@@ -816,22 +829,98 @@
                         </div>
 
                         <!-- Right: Zone List and Instructions -->
-                        <div class="space-y-4">
+                        <div class="w-80 space-y-4 flex-shrink-0">
                             <!-- Defined Zones -->
                             <div>
-                                <h3 class="text-sm font-semibold text-gray-900 mb-2">Defined Zones</h3>
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-sm font-semibold text-gray-900">Defined Zones ({zones.length})</h3>
+                                    {#if unnamedZonesCount > 0}
+                                        <span class="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                                            {unnamedZonesCount} unnamed
+                                        </span>
+                                    {/if}
+                                </div>
                                 {#if zones.length > 0}
                                     <div class="space-y-2">
                                         {#each zones as zone, i}
-                                            <div class="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg">
-                                                <div class="w-8 h-8 bg-[#E76A23] text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
-                                                    {i + 1}
+                                            {#if zone.name}
+                                                <!-- Named zone -->
+                                                <div class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                                                    <div class="w-7 h-7 bg-[#E76A23] text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                                        {i + 1}
+                                                    </div>
+                                                    <div class="flex-1 min-w-0">
+                                                        <div class="text-sm font-medium text-gray-900 truncate">{zone.name}</div>
+                                                        <div class="text-xs text-gray-500">{zone.points.length} points</div>
+                                                    </div>
+                                                    <button
+                                                        on:click={() => {
+                                                            zones = zones.filter((_, index) => index !== i);
+                                                        }}
+                                                        class="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                                        title="Delete zone"
+                                                    >
+                                                        <X class="w-4 h-4" />
+                                                    </button>
                                                 </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="text-sm font-medium text-gray-900 truncate">{zone.name}</div>
-                                                    <div class="text-xs text-gray-500">{zone.points.length} points</div>
+                                            {:else}
+                                                <!-- Unnamed zone - needs name input -->
+                                                <div class="p-3 bg-white border-2 border-gray-300 rounded-lg">
+                                                    <div class="flex items-center gap-3 mb-2.5">
+                                                        <div class="w-7 h-7 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                                            {i + 1}
+                                                        </div>
+                                                        <div class="flex-1 text-xs text-gray-500">
+                                                            {zone.points.length} points
+                                                        </div>
+                                                        <button
+                                                            on:click={() => {
+                                                                zones = zones.filter((_, index) => index !== i);
+                                                            }}
+                                                            class="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                                            title="Delete zone"
+                                                        >
+                                                            <X class="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                    <div class="flex items-center gap-2">
+                                                        <input
+                                                            bind:this={zoneNameInputs[i]}
+                                                            type="text"
+                                                            value={tempZoneNames[i] !== undefined ? tempZoneNames[i] : zone.name}
+                                                            on:input={(e) => {
+                                                                tempZoneNames[i] = e.currentTarget.value;
+                                                            }}
+                                                            placeholder="Enter zone name..."
+                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:border-transparent"
+                                                            on:keydown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    const name = tempZoneNames[i] !== undefined ? tempZoneNames[i] : zone.name;
+                                                                    if (name && name.trim()) {
+                                                                        zone.name = name.trim();
+                                                                        delete tempZoneNames[i];
+                                                                        zones = [...zones]; // Trigger reactivity to update UI
+                                                                    }
+                                                                }
+                                                            }}
+                                                        />
+                                                        <button
+                                                            on:click={() => {
+                                                                const name = tempZoneNames[i] !== undefined ? tempZoneNames[i] : zone.name;
+                                                                if (name && name.trim()) {
+                                                                    zone.name = name.trim();
+                                                                    delete tempZoneNames[i];
+                                                                    zones = [...zones]; // Trigger reactivity to update UI
+                                                                }
+                                                            }}
+                                                            disabled={!tempZoneNames[i] && (!zone.name || !zone.name.trim()) || (tempZoneNames[i] !== undefined && !tempZoneNames[i].trim())}
+                                                            class="px-4 py-2 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                        >
+                                                            Save
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            {/if}
                                         {/each}
                                     </div>
                                 {:else}
@@ -841,13 +930,14 @@
 
                             <!-- Instructions -->
                             <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                                <h4 class="text-sm font-semibold text-gray-900 mb-2">Drawing Instructions</h4>
-                                <ul class="text-xs text-gray-800 space-y-1">
-                                    <li>• Click on the snapshot to place zone boundary points</li>
-                                    <li>• Close the polygon to complete the zone</li>
-                                    <li>• Enter a name for each zone</li>
-                                    <li>• Add multiple zones as needed</li>
-                                    <li>• Zones are optional - skip if monitoring entire area</li>
+                                <h4 class="text-sm font-semibold text-gray-900 mb-2">How to Draw Zones</h4>
+                                <ul class="text-xs text-gray-800 space-y-1.5">
+                                    <li>• <strong>Click</strong> to place boundary points (min 3)</li>
+                                    <li>• Press <strong>Enter</strong> to finish zone</li>
+                                    <li>• Enter zone name and click <strong>Save</strong></li>
+                                    <li>• Press <strong>ESC</strong> to cancel current drawing</li>
+                                    <li>• All zones must be named before continuing</li>
+                                    <li>• Zones are optional - skip this step if needed</li>
                                 </ul>
                             </div>
                         </div>
@@ -949,10 +1039,10 @@
                     </button>
 
                     <div class="flex items-center space-x-2">
-                        {#if currentStep < 3}
+                        {#if currentStep < 4}
                             <button
                                 on:click={nextStep}
-                                disabled={currentStep === 1 && !canProceedStep1 || currentStep === 2 && !canProceedStep2}
+                                disabled={currentStep === 1 && !canProceedStep1 || currentStep === 2 && !canProceedStep2 || currentStep === 3 && !canProceedStep3}
                                 class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Next

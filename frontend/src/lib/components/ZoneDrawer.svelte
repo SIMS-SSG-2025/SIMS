@@ -7,6 +7,7 @@
     export let zones: { points: { x: number; y: number }[], name: string }[] = [];
     export let imageSrc: string = '/snapshot.jpg';
     export let readOnly: boolean = false;
+    export let hideControls: boolean = false;
 
     // Internal state - managed by ZoneDrawer itself
     let showZones = true;
@@ -27,6 +28,7 @@
 
     let showNameInput = false;
     let newZoneName: string = "";
+    let helperFaded = false; // Track if helper should be faded
 
     onMount(() => {
         // Only initialize canvas for interactive mode
@@ -47,11 +49,13 @@
 
         if (!readOnly) {
             window.addEventListener('resize', updateCanvasSize);
+            window.addEventListener('keydown', handleKeyDown);
         }
 
         return () => {
             if (!readOnly) {
                 window.removeEventListener('resize', updateCanvasSize);
+                window.removeEventListener('keydown', handleKeyDown);
             }
         };
     })
@@ -98,6 +102,16 @@
     function handleMouseMove(event: MouseEvent): void {
         if (readOnly) return;
         const pos = getMousePos(event);
+
+        // Check if mouse is near the helper area (top-left corner)
+        // Helper is at top-4 left-4, approximately 0-250px from left, 0-60px from top
+        if (hideControls && points.length >= 3) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            helperFaded = (mouseX < 300 && mouseY < 80);
+        }
+
         const idx = findPointIndex(pos);
         if (draggingPointsIndex !== null) {
             const pos = getMousePos(event);
@@ -120,12 +134,16 @@
 
     function handleClick(event: MouseEvent): void {
         if (readOnly) return;
+        if (showNameInput) return; // Don't add points while naming a zone
+
         const pos = getMousePos(event);
+
         // Only add a point if not clicking on an existing point
         if (findPointIndex(pos) !== -1) return;
+
         points = [...points, {x: pos.x, y: pos.y}];
         points = orderPolygonPoints(points);
-        console.log(points);
+        console.log("Points:", points.length);
         redraw();
     }
 
@@ -159,7 +177,33 @@
         onFinishZone(normalizedPoints, newZoneName || `Zone ${zones.length + 1}`);
         points = [];
         showNameInput = false;
+        newZoneName = "";
         redraw();
+    }
+
+    function cancelDrawing() {
+        if (readOnly) return;
+        points = [];
+        showNameInput = false;
+        newZoneName = "";
+        redraw();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+        if (event.key === 'Escape') {
+            cancelDrawing();
+        } else if (event.key === 'Enter') {
+            if (points.length >= 3) {
+                // Finalize the polygon and create the zone
+                const normalizedPoints = points.map(p => ({
+                    x: p.x / canvas.width,
+                    y: p.y / canvas.height
+                }));
+                onFinishZone(normalizedPoints, ""); // Empty name - needs to be filled
+                points = []; // Reset for next zone
+                redraw();
+            }
+        }
     }
 
     // Zone management functions (moved from parent)
@@ -252,8 +296,8 @@
     }
 </script>
 
-<div class="flex flex-col">
-    {#if !readOnly}
+<div class="flex flex-col relative">
+    {#if !readOnly && !hideControls}
         <!-- Control Panel -->
         <div class="bg-white border border-gray-100 p-3 mb-3 shadow-sm">
             <!-- Top Row: Zone visibility and drawing controls -->
@@ -395,6 +439,19 @@
                 class="absolute inset-0"
                 style="cursor: crosshair; width: 100%; height: 100%; background: transparent; z-index:2;"
             ></canvas>
+
+            <!-- Helper message when 3+ points are placed -->
+            {#if hideControls && points.length >= 3}
+                <div
+                    class="absolute top-4 left-4 bg-[#E76A23] text-white px-4 py-2 rounded-lg shadow-lg transition-opacity duration-200 pointer-events-none"
+                    class:opacity-10={helperFaded}
+                    style="z-index: 50;"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold">Press <kbd class="px-1.5 py-0.5 bg-white/20 rounded text-xs font-mono">Enter</kbd> to complete zone</span>
+                    </div>
+                </div>
+            {/if}
         {/if}
     </div>
 </div>
