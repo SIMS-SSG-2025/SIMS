@@ -55,7 +55,16 @@
           beginAtZero: true
         },
         y: {
-          beginAtZero: true
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            callback: function(value: any) {
+              if (Number.isInteger(value)) {
+                return value;
+              }
+              return null;
+            }
+          }
         }
       }
     }

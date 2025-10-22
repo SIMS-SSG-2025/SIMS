@@ -6,11 +6,13 @@
     import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
     import LogModal from "$lib/components/LogModal.svelte";
     import ChartModal from "$lib/components/ChartModal.svelte";
+    import ZoneBreakdownModal from "$lib/components/ZoneBreakdownModal.svelte";
     import StatCard from "$lib/components/StatCard.svelte";
+    import StatCardMulti from "$lib/components/StatCardMulti.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
     import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
     import { onMount } from "svelte";
-    import { fetchCurrentConfig, type Config } from "$lib/api/config";
+    import { fetchCurrentConfig, getSystemStatus, type Config } from "$lib/api/config";
     import {
         type DashboardStats,
         type TimeRangeOption,
@@ -32,12 +34,11 @@
     import { chartPreferences } from "$lib/stores/chartPreferences";
 
     import { Settings, Download, Car, TriangleAlert, Ban, Users, FileText, ZoomIn, SlidersVertical, Camera } from "lucide-svelte";
-
     // ============================================
     // DATA SOURCE CONFIGURATION
     // ============================================
     // Set this to false to use mock data for charts
-    const USE_REAL_DATA = false;
+    const USE_REAL_DATA = true;
 
     let now = $state(new Date());
     let interval: any;
@@ -92,6 +93,7 @@
 
     let config = $state<Config | null>(null);
     let configLoading = $state(true);
+    let systemRunning = $state(false);
 
     let stats = $state<DashboardStats>({
         detectedPersons: 0,
@@ -99,9 +101,37 @@
         ppeBreaches: 0,
         helmetBreaches: 0,
         vestBreaches: 0,
-        riskZoneEntries: 0
+        riskZoneEntries: 0,
+        zoneEntryBreakdown: new Map()
     });
     let statsLoading = $state(false);
+
+    // Create zone breakdown items for StatCardMulti
+    let zoneBreakdownItems = $derived(() => {
+        if (!config || !stats.zoneEntryBreakdown) return [];
+
+        const items: Array<{label: string; value: number; color?: string}> = [];
+        const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500'];
+        let colorIndex = 0;
+
+        stats.zoneEntryBreakdown.forEach((count, zoneId) => {
+            // Find zone by ID
+            const zone = config?.zones.find(z => z.zone_id === zoneId);
+
+            // Zone names are now preserved when updating config
+            const zoneName = zone?.name || `Zone ${zoneId}`;
+
+            items.push({
+                label: zoneName,
+                value: count,
+                color: colors[colorIndex % colors.length]
+            });
+            colorIndex++;
+        });
+
+        // Sort by value descending to show most active zones first
+        return items.sort((a, b) => b.value - a.value);
+    });
 
     // Chart data with all 4 series
     let chartLabels = $state<string[]>([]);
@@ -246,10 +276,11 @@
         initialLoad();
 
         // Start polling every 5 seconds after initial load (only for real data)
-        pollingInterval = setInterval(() => {
+        pollingInterval = setInterval(async () => {
             if (isInitialLoadComplete && USE_REAL_DATA) {
                 loadStatistics(false, true); // Update stats - force refresh to get new events
                 updateChartDataSilently(); // Update chart data without animation
+                systemRunning = await getSystemStatus(); // Update system status
             }
         }, 5000);
 
@@ -264,9 +295,11 @@
             configLoading = true;
             statsLoading = true;
 
-            // Load configuration first
+            // Load configuration and system status
             config = await fetchCurrentConfig();
+            systemRunning = await getSystemStatus();
             console.log("Loaded config:", $state.snapshot(config));
+            console.log("System running:", systemRunning);
             configLoading = false;
 
             // If we have a location ID, fetch all data in one go
@@ -570,6 +603,7 @@
     let showLogModal = $state(false);
     let showDateRangePicker = $state(false);
     let showChartModal = $state(false);
+    let showZoneBreakdownModal = $state(false);
     let chartModalTitle = $state('Chart Details');
 
     function openSettingsModal() {
@@ -598,6 +632,12 @@
     function closeDateRangePicker() {
         showDateRangePicker = false;
     }
+    function openZoneBreakdownModal() {
+        showZoneBreakdownModal = true;
+    }
+    function closeZoneBreakdownModal() {
+        showZoneBreakdownModal = false;
+    }
     function handleDateRangeApply(start: Date, end: Date) {
         customTimeRange = { start, end };
         selectedRange = 'custom';
@@ -622,11 +662,11 @@
     }
 
     const ranges: { label: string; value: TimeRangeOption }[] = [
-        { label: "Day", value: "day" },
-        { label: "Week", value: "week" },
-        { label: "Month", value: "month" },
+        { label: "Today", value: "day" },
+        { label: "This Week", value: "week" },
+        { label: "This Month", value: "month" },
         { label: "All", value: "all" },
-        { label: "Custom", value: "custom" }
+        { label: "Custom Date", value: "custom" }
     ];
 
     function selectRange(val: TimeRangeOption) {
@@ -678,7 +718,31 @@
         </div>
 
         <!-- Right: Settings -->
-        <div class="flex items-center gap-1 lg:gap-2">
+        <div class="flex items-center gap-1 lg:gap-3">
+            {#if !config || !systemRunning}
+                <!-- Show setup button if no config or system not running -->
+                <button
+                    class="px-3 lg:px-4 py-1.5 lg:py-2 rounded-lg bg-[#E76A23] text-white hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center gap-2 text-xs lg:text-sm"
+                    onclick={openConfigModal}
+                    aria-label="Setup Configuration"
+                >
+                    <SlidersVertical class="h-4 w-4 lg:h-5 lg:w-5" />
+                    Setup
+                </button>
+            {:else}
+                <!-- Show running config status -->
+                <button
+                    class="flex items-center gap-2 px-3 lg:px-4 py-1.5 lg:py-2 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition cursor-pointer"
+                    onclick={openConfigModal}
+                    aria-label="View Configuration"
+                >
+                    <div class="relative flex items-center">
+                        <div class="w-2 h-2 lg:w-2.5 lg:h-2.5 bg-green-500 rounded-full animate-pulse"></div>
+                        <div class="absolute w-2 h-2 lg:w-2.5 lg:h-2.5 bg-green-500 rounded-full opacity-75"></div>
+                    </div>
+                    <span class="text-xs lg:text-sm font-medium text-green-900">{config.locationName}</span>
+                </button>
+            {/if}
             <button class="p-1.5 lg:p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
                 <Download size={20} class="lg:w-6 lg:h-6 text-gray-600" />
             </button>
@@ -732,7 +796,7 @@
         <!-- Dashboard Content -->
         <div class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto" style="padding-top: clamp(0.5rem, 1vh, 1.5rem); padding-bottom: clamp(0.5rem, 1vh, 1.5rem);">
             <!-- Cards Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" style="height: clamp(85px, 14vh, 130px); margin-bottom: clamp(1rem, 2.5vh, 2rem);">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4" style="grid-auto-rows: clamp(85px, 14vh, 130px);">
         <StatCard
             title="Detected Persons"
             value={stats.detectedPersons}
@@ -754,11 +818,13 @@
             icon={TriangleAlert}
         />
 
-        <StatCard
+        <StatCardMulti
             title="Risk Zone Entries"
-            value={stats.riskZoneEntries}
+            totalValue={stats.riskZoneEntries}
+            items={zoneBreakdownItems()}
             iconColor="text-red-600"
             icon={Ban}
+            onclick={openZoneBreakdownModal}
         />
     </div>
 
@@ -841,16 +907,8 @@
     {:else if activeTab === 'area'}
         <!-- Area Management Content -->
         <div class="px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-7xl mx-auto">
-            <div class="flex items-center justify-between mb-6">
+            <div class="mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">Area Management</h2>
-                <button
-                    class="px-4 py-2 rounded-lg bg-[#E76A23] text-white hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center gap-2"
-                    onclick={openConfigModal}
-                    aria-label="Setup Configuration"
-                >
-                    <SlidersVertical class="h-5 w-5" />
-                    Setup Configuration
-                </button>
             </div>
 
             <!-- Snapshot with Zones -->
@@ -894,6 +952,13 @@
         open={showDateRangePicker}
         onClose={closeDateRangePicker}
         onApply={handleDateRangeApply}
+    />
+
+    <ZoneBreakdownModal
+        open={showZoneBreakdownModal}
+        onClose={closeZoneBreakdownModal}
+        items={zoneBreakdownItems()}
+        totalEntries={stats.riskZoneEntries}
     />
 
     <ChartModal

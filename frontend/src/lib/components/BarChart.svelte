@@ -68,6 +68,15 @@
                     },
                     y: {
                         beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(value) {
+                                if (Number.isInteger(value)) {
+                                    return value;
+                                }
+                                return null;
+                            }
+                        },
                         grid: {
                             color: 'rgba(0, 0, 0, 0.05)'
                         }

@@ -70,6 +70,11 @@ class DatabaseManager:
                 (location_id,),
             )
 
+    def deactivate_all_locations(self):
+        """Deactivate all locations (used when stopping the system)"""
+        with self.sqlconn:
+            self.sqlconn.execute("UPDATE location SET is_active = 0")
+
     def delete_zones_by_location(self, location_id):
         with self.sqlconn:
             self.sqlconn.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))

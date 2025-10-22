@@ -180,6 +180,8 @@ def start_system():
 def stop_system():
     try:
         db_manager.set_ai_running(False)
+        # Deactivate all locations when stopping the system
+        db_manager.deactivate_all_locations()
         return {"status": "AI stopping"}
     except Exception as e:
         logger.error(f"Failed to stop AI system: {e}")

@@ -40,6 +40,7 @@
     let customSnapshotPath: string = '';
     let startingSystem = false;
     let systemStatusMessage: string = '';
+    let locationsLoading = false;
 
     // Load stored configuration when modal opens
     $: if (open) {
@@ -53,7 +54,9 @@
     }
 
     async function loadAllLocations() {
+        locationsLoading = true;
         allLocations = await fetchAllLocations();
+        locationsLoading = false;
     }
 
     async function selectLocation(locationId: number) {
@@ -79,7 +82,7 @@
 
         isEditingExisting = true;
         viewMode = "edit";
-        currentStep = 2; // Go to zones step
+        currentStep = 3; // Go to zones step
     }
 
     async function makeLocationActive(locationId: number) {
@@ -173,7 +176,15 @@
                 startingSystem = true;
                 systemStatusMessage = 'Stopping monitoring system...';
                 await stopSystem();
+
+                // Wait a moment for the backend to deactivate the location
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Reload both stored config and all locations from backend
+                // The backend has deactivated the location, so storedConfig should be null
                 await loadStoredConfig();
+                await loadAllLocations();
+
                 systemStatusMessage = '';
                 backToList();
             } catch (error: any) {
@@ -199,13 +210,14 @@
     }
 
     const steps = [
-        { id: 1, title: "Setup", description: "Current or new configuration" },
-        { id: 2, title: "Zones", description: "Define monitoring zones" },
-        { id: 3, title: "Summary", description: "Review configuration" }
+        { id: 1, title: "Setup", description: "Choose or create location" },
+        { id: 2, title: "Snapshot", description: "Capture camera view" },
+        { id: 3, title: "Zones", description: "Define monitoring zones" },
+        { id: 4, title: "Summary", description: "Review configuration" }
     ];
 
     function nextStep() {
-        if (currentStep < 3) {
+        if (currentStep < 4) {
             currentStep += 1;
         }
     }
@@ -312,7 +324,9 @@
     }
 
     $: canProceedStep1 = locationName.trim().length > 0;
-    $: canProceedStep2 = true;
+    $: canProceedStep2 = customSnapshotPath.trim().length > 0;
+    $: canProceedStep3 = true; // Can proceed even without zones
+
 </script>
 
 <Modal {open} onClose={handleClose} modalClass="p-0 w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -329,12 +343,12 @@
                         <button
                             class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-colors
                                 {currentStep === step.id
-                                    ? 'bg-blue-600 text-white'
+                                    ? 'bg-[#E76A23] text-white'
                                     : currentStep > step.id
                                         ? 'bg-green-500 text-white'
                                         : 'bg-gray-200 text-gray-600'}"
                             on:click={() => goToStep(step.id)}
-                            disabled={step.id > 1 && !canProceedStep1 || step.id > 2 && !canProceedStep2}
+                            disabled={step.id > 1 && !canProceedStep1 || step.id > 2 && !canProceedStep2 || step.id > 3 && !canProceedStep3}
                         >
                             {#if currentStep > step.id}
                                 <Check class="w-4 h-4" />
@@ -366,33 +380,38 @@
                             <p class="text-sm text-gray-600">Select an existing location or create a new one</p>
                         </div>
 
-                        <!-- Current Active Location -->
-                        {#if storedConfig}
-                            <div class="mb-6 p-4 bg-green-50 border-2 border-green-200 rounded-lg">
-                                <div class="flex items-start justify-between">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2 mb-2">
-                                            <span class="px-2 py-1 bg-green-600 text-white text-xs font-semibold rounded">CURRENTLY RUNNING</span>
-                                            <h4 class="text-base font-semibold text-gray-900">{storedConfig.locationName}</h4>
-                                        </div>
-                                        <p class="text-sm text-gray-600 mb-3">
-                                            {storedConfig.zones.length} zone{storedConfig.zones.length !== 1 ? 's' : ''} configured
-                                        </p>
-                                        <div class="flex gap-2">
-                                            <button
-                                                on:click={loadExistingConfig}
-                                                class="px-3 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
-                                            >
-                                                View
-                                            </button>
-                                        </div>
-                                    </div>
+                        <!-- Loading State -->
+                        {#if locationsLoading}
+                            <div class="flex items-center justify-center py-12">
+                                <div class="text-center">
+                                    <LoaderCircle class="w-8 h-8 text-[#E76A23] animate-spin mx-auto mb-3" />
+                                    <p class="text-sm text-gray-600">Loading configurations...</p>
                                 </div>
                             </div>
-                        {/if}
+                        {:else}
+                            <!-- Current Active Location -->
+                            {#if storedConfig}
+                                <button
+                                    on:click={loadExistingConfig}
+                                    class="w-full mb-6 p-4 bg-green-50 border-2 border-green-200 rounded-lg hover:bg-green-100 transition-colors cursor-pointer text-left"
+                                >
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <span class="px-2 py-1 bg-green-600 text-white text-xs font-semibold rounded">CURRENTLY RUNNING</span>
+                                                <h4 class="text-base font-semibold text-gray-900">{storedConfig.locationName}</h4>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mb-1">
+                                                {storedConfig.zones.length} zone{storedConfig.zones.length !== 1 ? 's' : ''} configured
+                                            </p>
+                                            <p class="text-xs text-green-700 font-medium">Click to edit</p>
+                                        </div>
+                                    </div>
+                                </button>
+                            {/if}
 
-                        <!-- All Locations List -->
-                        {#if allLocations.length > 0}
+                            <!-- All Locations List -->
+                            {#if allLocations.length > 0}
                             <div class="mb-6">
                                 <h4 class="text-sm font-semibold text-gray-700 mb-3">
                                     {storedConfig ? 'Other Locations' : 'Available Locations'}
@@ -400,31 +419,31 @@
                                 <div class="space-y-2 max-h-96 overflow-y-auto">
                                     {#each allLocations as location}
                                         {#if !storedConfig || storedConfig.locationId !== location.locationId}
-                                            <div
-                                                class="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
-                                            >
-                                                <div class="flex-1">
-                                                    <h5 class="text-sm font-medium text-gray-900">{location.locationName}</h5>
-                                                    <p class="text-xs text-gray-500">
-                                                        {location.zoneCount} zone{location.zoneCount !== 1 ? 's' : ''}
-                                                    </p>
-                                                </div>
-                                                <div class="flex gap-2">
+                                            <div class="relative group">
+                                                <button
+                                                    on:click={() => selectLocation(location.locationId)}
+                                                    class="w-full flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-[#E76A23] hover:bg-orange-50 transition-colors cursor-pointer text-left"
+                                                >
+                                                    <div class="flex-1">
+                                                        <h5 class="text-sm font-medium text-gray-900">{location.locationName}</h5>
+                                                        <p class="text-xs text-gray-500">
+                                                            {location.zoneCount} zone{location.zoneCount !== 1 ? 's' : ''}
+                                                        </p>
+                                                        <p class="text-xs text-[#E76A23] font-medium mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Click to edit</p>
+                                                    </div>
+                                                </button>
+                                                <div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 z-10">
                                                     <button
-                                                        on:click={() => selectLocation(location.locationId)}
-                                                        class="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                                                    >
-                                                        View
-                                                    </button>
-                                                    <button
-                                                        on:click={() => makeLocationActive(location.locationId)}
+                                                        on:click|stopPropagation={() => makeLocationActive(location.locationId)}
                                                         class="px-3 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
+                                                        title="Activate this location"
                                                     >
                                                         Activate
                                                     </button>
                                                     <button
-                                                        on:click={() => removeSelectedLocation(location.locationId)}
+                                                        on:click|stopPropagation={() => removeSelectedLocation(location.locationId)}
                                                         class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
+                                                        title="Delete this location"
                                                     >
                                                         Delete
                                                     </button>
@@ -436,16 +455,17 @@
                             </div>
                         {/if}
 
-                        <!-- New Location Button -->
-                        <button
-                            on:click={startNewLocation}
-                            class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors group"
-                        >
-                            <div class="flex items-center justify-center gap-2">
-                                <Plus class="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                                <span class="text-sm font-medium text-gray-600 group-hover:text-blue-600">Create New Location</span>
-                            </div>
-                        </button>
+                            <!-- New Location Button -->
+                            <button
+                                on:click={startNewLocation}
+                                class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#E76A23] hover:bg-orange-50 transition-colors group"
+                            >
+                                <div class="flex items-center justify-center gap-2">
+                                    <Plus class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23]" />
+                                    <span class="text-sm font-medium text-gray-600 group-hover:text-[#E76A23]">Create New Location</span>
+                                </div>
+                            </button>
+                        {/if}
                     </div>
                 </div>
             {:else if viewMode === "view"}
@@ -482,7 +502,7 @@
                                     {#each zones as zone, i}
                                         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                                             <div class="flex items-center gap-2">
-                                                <div class="w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                                <div class="w-7 h-7 bg-[#E76A23] text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                                                     {i + 1}
                                                 </div>
                                                 <span class="text-sm font-medium text-gray-900">{zone.name}</span>
@@ -515,7 +535,7 @@
                             {/if}
                             <button
                                 on:click={editLocation}
-                                class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm flex items-center justify-center gap-2"
+                                class="w-full px-4 py-3 bg-[#E76A23] text-white rounded-lg hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center justify-center gap-2"
                             >
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
@@ -527,7 +547,7 @@
                                 <button
                                     on:click={handleStopSystem}
                                     disabled={startingSystem}
-                                    class="w-full px-4 py-3 border border-orange-300 bg-white text-orange-700 rounded-lg hover:bg-orange-50 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    class="w-full px-4 py-3 border border-orange-700 bg-white text-orange-700 rounded-lg hover:bg-red-50 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {#if startingSystem}
                                         <LoaderCircle class="w-5 h-5 animate-spin" />
@@ -584,27 +604,23 @@
 
                             <!-- Current Active Location -->
                             {#if storedConfig}
-                                <div class="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                                <button
+                                    on:click={loadExistingConfig}
+                                    class="w-full mb-6 p-4 bg-orange-50 border-2 border-orange-200 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer text-left"
+                                >
                                     <div class="flex items-start justify-between">
                                         <div class="flex-1">
                                             <div class="flex items-center gap-2 mb-2">
-                                                <span class="px-2 py-1 bg-blue-600 text-white text-xs font-semibold rounded">ACTIVE</span>
+                                                <span class="px-2 py-1 bg-[#E76A23] text-white text-xs font-semibold rounded">ACTIVE</span>
                                                 <h4 class="text-base font-semibold text-gray-900">{storedConfig.locationName}</h4>
                                             </div>
-                                            <p class="text-sm text-gray-600 mb-3">
+                                            <p class="text-sm text-gray-600 mb-1">
                                                 {storedConfig.zones.length} zone{storedConfig.zones.length !== 1 ? 's' : ''} configured
                                             </p>
-                                            <div class="flex gap-2">
-                                                <button
-                                                    on:click={loadExistingConfig}
-                                                    class="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                                                >
-                                                    View
-                                                </button>
-                                            </div>
+                                            <p class="text-xs text-[#E76A23] font-medium">Click to edit</p>
                                         </div>
                                     </div>
-                                </div>
+                                </button>
                             {/if}
 
                             <!-- All Locations List -->
@@ -613,33 +629,31 @@
                                     <h4 class="text-sm font-semibold text-gray-700 mb-3">Available Locations</h4>
                                     <div class="space-y-2 max-h-96 overflow-y-auto">
                                         {#each allLocations as location}
-                                            <div
-                                                class="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-300 transition-colors
-                                                    {storedConfig && storedConfig.locationId === location.locationId ? 'opacity-50' : ''}"
-                                            >
-                                                <div class="flex-1">
-                                                    <h5 class="text-sm font-medium text-gray-900">{location.locationName}</h5>
-                                                    <p class="text-xs text-gray-500">
-                                                        {location.zoneCount} zone{location.zoneCount !== 1 ? 's' : ''}
-                                                    </p>
-                                                </div>
-                                                <div class="flex gap-2">
-                                                    {#if !storedConfig || storedConfig.locationId !== location.locationId}
+                                            {#if !storedConfig || storedConfig.locationId !== location.locationId}
+                                                <div class="relative group">
+                                                    <button
+                                                        on:click={() => selectLocation(location.locationId)}
+                                                        class="w-full flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-[#E76A23] hover:bg-orange-50 transition-colors cursor-pointer text-left"
+                                                    >
+                                                        <div class="flex-1">
+                                                            <h5 class="text-sm font-medium text-gray-900">{location.locationName}</h5>
+                                                            <p class="text-xs text-gray-500">
+                                                                {location.zoneCount} zone{location.zoneCount !== 1 ? 's' : ''}
+                                                            </p>
+                                                            <p class="text-xs text-[#E76A23] font-medium mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Click to edit</p>
+                                                        </div>
+                                                    </button>
+                                                    <div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 z-10">
                                                         <button
-                                                            on:click={() => selectLocation(location.locationId)}
-                                                            class="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                                                        >
-                                                            View
-                                                        </button>
-                                                        <button
-                                                            on:click={() => removeSelectedLocation(location.locationId)}
+                                                            on:click|stopPropagation={() => removeSelectedLocation(location.locationId)}
                                                             class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
+                                                            title="Delete this location"
                                                         >
                                                             Delete
                                                         </button>
-                                                    {/if}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            {/if}
                                         {/each}
                                     </div>
                                 </div>
@@ -648,11 +662,11 @@
                             <!-- New Location Button -->
                             <button
                                 on:click={startNewLocation}
-                                class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors group"
+                                class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#E76A23] hover:bg-orange-50 transition-colors group"
                             >
                                 <div class="flex items-center justify-center gap-2">
-                                    <Plus class="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                                    <span class="text-sm font-medium text-gray-600 group-hover:text-blue-600">Create New Location</span>
+                                    <Plus class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23]" />
+                                    <span class="text-sm font-medium text-gray-600 group-hover:text-[#E76A23]">Create New Location</span>
                                 </div>
                             </button>
                         </div>
@@ -669,14 +683,14 @@
                                         type="text"
                                         bind:value={locationName}
                                         placeholder="e.g., Factory Floor A, Warehouse Entrance..."
-                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:border-transparent text-sm"
                                     />
                                 </div>
-                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
                                     <div class="flex">
-                                        <Info class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                                        <Info class="w-5 h-5 text-[#E76A23] flex-shrink-0 mt-0.5" />
                                         <div class="ml-3">
-                                            <p class="text-sm text-blue-800">
+                                            <p class="text-sm text-gray-800">
                                                 Choose a name that helps you easily identify this location in your dashboard.
                                             </p>
                                         </div>
@@ -687,17 +701,105 @@
                     {/if}
                 </div>
             {:else if currentStep === 2}
-                <!-- Step 2: Zone Setup -->
+                <!-- Step 2: Snapshot -->
                 <div class="flex-1 overflow-y-auto px-6 py-6">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Left: Zone Drawing Area -->
-                        <div class="lg:col-span-2">
+                    <div class="max-w-4xl mx-auto h-full flex flex-col">
+                        {#if !customSnapshotPath}
+                            <!-- Title only shown when no snapshot -->
+                            <div class="text-center mb-6">
+                                <h3 class="text-2xl font-bold text-gray-900 mb-2">Camera Snapshot</h3>
+                                <p class="text-gray-600">Capture a snapshot from the camera to use for zone configuration</p>
+                            </div>
+                        {/if}
+
+                        {#if customSnapshotPath}
+                            <!-- Snapshot Preview -->
+                            <div class="flex-1 flex flex-col">
+                                <div class="rounded-lg overflow-hidden p-3 flex-1 flex flex-col">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <Check class="w-5 h-5 text-green-600" />
+                                            <span class="text-sm font-semibold text-green-900">Snapshot Captured Successfully</span>
+                                        </div>
+                                        <button
+                                            on:click={loadSnapshot}
+                                            disabled={snapshotLoading}
+                                            class="px-4 py-1.5 text-xs font-medium rounded-md border-2 border-[#E76A23] text-[#E76A23] hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {#if snapshotLoading}
+                                                <LoaderCircle class="w-3 h-3 mr-1.5 inline animate-spin" />
+                                                Retaking...
+                                            {:else}
+                                                <Camera class="w-3 h-3 mr-1.5 inline" />
+                                                Retake
+                                            {/if}
+                                        </button>
+                                    </div>
+                                    <div class="border border-gray-300 rounded-lg overflow-hidden bg-white flex-1">
+                                        <img src={customSnapshotPath} alt="Camera Snapshot" class="w-full h-full object-contain" />
+                                    </div>
+                                </div>
+                            </div>
+                        {:else}
+                            <!-- No Snapshot - Fetch Button -->
+                            <div class="text-center">
+                                <div class="mb-6">
+                                    <Camera class="w-24 h-24 text-gray-300 mx-auto mb-4" />
+                                </div>
+
+                                <button
+                                    on:click={loadSnapshot}
+                                    disabled={snapshotLoading || !locationName.trim()}
+                                    class="px-8 py-3 text-base font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {#if snapshotLoading}
+                                        <LoaderCircle class="w-5 h-5 mr-2 inline animate-spin" />
+                                        Fetching Snapshot...
+                                    {:else}
+                                        <Camera class="w-5 h-5 mr-2 inline" />
+                                        Fetch Snapshot
+                                    {/if}
+                                </button>
+
+                                {#if !locationName.trim()}
+                                    <p class="text-xs text-gray-500 mt-3">Enter a location name in Step 1 to fetch a snapshot</p>
+                                {/if}
+                            </div>
+                        {/if}
+
+                        {#if snapshotError}
+                            <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800">
+                                <strong>Error:</strong> {snapshotError}
+                            </div>
+                        {/if}
+
+                        {#if !customSnapshotPath}
+                            <!-- Instructions only shown when no snapshot -->
+                            <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 mt-6">
+                                <div class="flex">
+                                    <Info class="w-5 h-5 text-[#E76A23] flex-shrink-0 mt-0.5" />
+                                    <div class="ml-3">
+                                        <p class="text-sm text-gray-800">
+                                            Make sure there are no people in the camera view when taking the snapshot.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+            {:else if currentStep === 3}
+                <!-- Step 3: Zone Setup -->
+                <div class="flex-1 overflow-y-auto px-6 py-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                        <!-- Left: Zone Drawing Area (Larger) -->
+                        <div class="lg:col-span-3">
                             <div class="border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
                                 {#if customSnapshotPath}
                                     <ZoneDrawer
                                         onFinishZone={handleFinishZone}
-                                        width={1200}
-                                        height={675}
+                                        width={1400}
+                                        height={787}
                                         bind:zones={zones}
                                         imageSrc={customSnapshotPath}
                                     />
@@ -706,38 +808,15 @@
                                         <div>
                                             <Camera class="w-16 h-16 text-gray-400 mx-auto mb-4" />
                                             <h3 class="text-lg font-medium text-gray-900 mb-2">No Snapshot Available</h3>
-                                            <p class="text-sm text-gray-600">Fetch a snapshot from the camera to define monitoring zones.</p>
+                                            <p class="text-sm text-gray-600">Go back to Step 2 to fetch a snapshot.</p>
                                         </div>
                                     </div>
                                 {/if}
                             </div>
                         </div>
 
-                        <!-- Right: Controls and Zone List -->
+                        <!-- Right: Zone List and Instructions -->
                         <div class="space-y-4">
-                            <!-- Fetch Snapshot Button -->
-                            <div>
-                                <h4 class="text-sm font-semibold text-gray-900 mb-2">Camera Snapshot</h4>
-                                <button
-                                    on:click={loadSnapshot}
-                                    disabled={snapshotLoading || !locationName.trim()}
-                                    class="w-full px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    {#if snapshotLoading}
-                                        <LoaderCircle class="w-4 h-4 mr-2 inline animate-spin" />
-                                        Fetching Snapshot...
-                                    {:else}
-                                        <Camera class="w-4 h-4 mr-2 inline" />
-                                        Fetch Snapshot
-                                    {/if}
-                                </button>
-                                {#if snapshotError}
-                                    <div class="mt-2 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800">
-                                        {snapshotError}
-                                    </div>
-                                {/if}
-                            </div>
-
                             <!-- Defined Zones -->
                             <div>
                                 <h3 class="text-sm font-semibold text-gray-900 mb-2">Defined Zones</h3>
@@ -745,7 +824,7 @@
                                     <div class="space-y-2">
                                         {#each zones as zone, i}
                                             <div class="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg">
-                                                <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                                                <div class="w-8 h-8 bg-[#E76A23] text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
                                                     {i + 1}
                                                 </div>
                                                 <div class="flex-1 min-w-0">
@@ -761,20 +840,21 @@
                             </div>
 
                             <!-- Instructions -->
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <h4 class="text-sm font-semibold text-blue-900 mb-2">Drawing Instructions</h4>
-                                <ul class="text-xs text-blue-800 space-y-1">
+                            <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                <h4 class="text-sm font-semibold text-gray-900 mb-2">Drawing Instructions</h4>
+                                <ul class="text-xs text-gray-800 space-y-1">
                                     <li>• Click on the snapshot to place zone boundary points</li>
                                     <li>• Close the polygon to complete the zone</li>
                                     <li>• Enter a name for each zone</li>
                                     <li>• Add multiple zones as needed</li>
+                                    <li>• Zones are optional - skip if monitoring entire area</li>
                                 </ul>
                             </div>
                         </div>
                     </div>
                 </div>
-            {:else if currentStep === 3}
-                <!-- Step 3: Summary -->
+            {:else if currentStep === 4}
+                <!-- Step 4: Summary -->
                 <div class="flex-1 flex overflow-hidden">
                     <!-- Left Panel: Summary Information -->
                     <div class="w-72 border-r border-gray-200 bg-white p-4 overflow-y-auto flex-shrink-0">
@@ -801,7 +881,7 @@
                                     <div class="space-y-1.5">
                                         {#each zones as zone, i}
                                             <div class="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200">
-                                                <div class="w-6 h-6 bg-blue-600 text-white rounded flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                                <div class="w-6 h-6 bg-[#E76A23] text-white rounded flex items-center justify-center text-xs font-bold flex-shrink-0">
                                                     {i + 1}
                                                 </div>
                                                 <span class="text-xs font-medium text-gray-900 flex-1 truncate">{zone.name}</span>
@@ -862,7 +942,7 @@
                     <button
                         on:click={prevStep}
                         disabled={currentStep === 1}
-                        class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <ArrowLeft class="w-4 h-4 mr-2" />
                         Previous
@@ -873,7 +953,7 @@
                             <button
                                 on:click={nextStep}
                                 disabled={currentStep === 1 && !canProceedStep1 || currentStep === 2 && !canProceedStep2}
-                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Next
                                 <ChevronRight class="w-4 h-4 ml-2" />

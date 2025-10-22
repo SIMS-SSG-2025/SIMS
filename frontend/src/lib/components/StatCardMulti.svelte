@@ -3,48 +3,60 @@
         label: string;
         value: number;
         color?: string;
-        icon?: string;
     };
 
     type StatCardMultiProps = {
         title: string;
+        totalValue: number;
         items: StatItem[];
-        icon: string;
+        icon: any;  // Lucide icon component
         iconColor?: string;
+        onclick?: () => void;
     };
 
-    let { title, items, icon, iconColor = 'text-blue-600' }: StatCardMultiProps = $props();
+    let { title, totalValue, items, icon: Icon, iconColor = 'text-blue-600', onclick }: StatCardMultiProps = $props();
 
     function formatNumber(num: number): string {
         return num.toLocaleString();
     }
+
+    function handleClick() {
+        if (onclick) {
+            onclick();
+        }
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+        if (e.key === 'Enter' && onclick) {
+            onclick();
+        }
+    }
 </script>
 
-<div class="bg-white rounded-2xl shadow p-6 hover:shadow-lg transition-shadow min-h-[150px] flex flex-col">
-    <!-- Header with title and icon -->
-    <div class="flex items-center justify-between mb-4">
-        <p class="text-sm font-medium text-gray-500">{title}</p>
-        <div class="p-3 rounded-full bg-gray-50 {iconColor}">
-            {@html icon}
-        </div>
+{#if onclick}
+<button
+    class="bg-white rounded-2xl shadow p-3 xl:p-6 flex items-start justify-between h-full transition-shadow cursor-pointer hover:shadow-xl w-full text-left"
+    onclick={handleClick}
+>
+    <div class="flex-1 flex flex-col justify-center">
+        <p class="text-xs xl:text-sm font-medium text-gray-500 mb-0.5 xl:mb-1">{title}</p>
+        <p class="text-xl xl:text-3xl font-bold text-gray-800">{formatNumber(totalValue)}</p>
+        {#if items.length > 0}
+            <p class="text-xs text-gray-400 mt-1">Click to view breakdown</p>
+        {/if}
     </div>
-
-    <!-- Mini cards row -->
-    <div class="flex gap-3 flex-1">
-        {#each items as item}
-            <div class="flex-1 bg-gradient-to-br from-orange-50 to-white rounded-xl p-3 border border-orange-100 hover:border-orange-300 transition-all">
-                <div class="flex items-center gap-2 mb-1">
-                    {#if item.icon}
-                        <div class="{item.color || 'text-orange-600'}">
-                            {@html item.icon}
-                        </div>
-                    {/if}
-                    <p class="text-xs font-medium text-gray-600">{item.label}</p>
-                </div>
-                <p class="text-3xl font-bold {item.color || 'text-gray-800'} mt-1">
-                    {formatNumber(item.value)}
-                </p>
-            </div>
-        {/each}
+    <div class="p-2 xl:p-3 rounded-full bg-gray-50 {iconColor} flex-shrink-0">
+        <Icon class="h-4 w-4 xl:h-6 xl:w-6" />
+    </div>
+</button>
+{:else}
+<div class="bg-white rounded-2xl shadow p-3 xl:p-6 flex items-start justify-between h-full transition-shadow hover:shadow-lg">
+    <div class="flex-1 flex flex-col justify-center">
+        <p class="text-xs xl:text-sm font-medium text-gray-500 mb-0.5 xl:mb-1">{title}</p>
+        <p class="text-xl xl:text-3xl font-bold text-gray-800">{formatNumber(totalValue)}</p>
+    </div>
+    <div class="p-2 xl:p-3 rounded-full bg-gray-50 {iconColor} flex-shrink-0">
+        <Icon class="h-4 w-4 xl:h-6 xl:w-6" />
     </div>
 </div>
+{/if}

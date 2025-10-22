@@ -8,6 +8,7 @@ export interface DashboardStats {
     helmetBreaches: number;
     vestBreaches: number;
     riskZoneEntries: number;
+    zoneEntryBreakdown: Map<number, number>; // zone_id -> count
 }
 
 export interface Event {
@@ -125,13 +126,20 @@ export function findEarliestEventTime(events: Event[]): Date | null {
 // Mock data for development (to be replaced with API calls)
 export function getMockStats(timeRange: TimeRange): DashboardStats {
     // This is placeholder data - will be replaced with actual API call
+    const zoneEntryBreakdown = new Map<number, number>();
+    // Mock some zone entries (zone IDs 1, 2, 3)
+    zoneEntryBreakdown.set(1, Math.floor(Math.random() * 15) + 1);
+    zoneEntryBreakdown.set(2, Math.floor(Math.random() * 10) + 1);
+    const totalEntries = Array.from(zoneEntryBreakdown.values()).reduce((a, b) => a + b, 0);
+
     return {
         detectedPersons: Math.floor(Math.random() * 1000) + 100,
         detectedVehicles: Math.floor(Math.random() * 500) + 50,
         ppeBreaches: Math.floor(Math.random() * 50) + 5,
         helmetBreaches: Math.floor(Math.random() * 30) + 3,
         vestBreaches: Math.floor(Math.random() * 25) + 2,
-        riskZoneEntries: Math.floor(Math.random() * 30) + 2
+        riskZoneEntries: totalEntries,
+        zoneEntryBreakdown
     };
 }
 
@@ -418,6 +426,8 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
     const uniqueVehicles = new Set<number>();
     // Track unique persons with PPE breaches (one breach per person, regardless of what's missing)
     const uniquePPEBreaches = new Set<number>();
+    // Track zone entry breakdown
+    const zoneEntryBreakdown = new Map<number, number>();
 
     events.forEach(event => {
         // Assuming object_id differentiates between persons and vehicles
@@ -446,6 +456,9 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
         // You might want to add a flag in your Event type to distinguish entry types
         if (event.zone_id != null) {
             riskZoneEntries++;
+            // Track which zones were entered
+            const currentCount = zoneEntryBreakdown.get(event.zone_id) || 0;
+            zoneEntryBreakdown.set(event.zone_id, currentCount + 1);
         }
     });
 
@@ -459,7 +472,8 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
         ppeBreaches,
         helmetBreaches,
         vestBreaches,
-        riskZoneEntries: riskZoneEntries
+        riskZoneEntries: riskZoneEntries,
+        zoneEntryBreakdown
     };
 }
 
@@ -469,19 +483,32 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
  * @returns PPEComplianceData object
  */
 export function calculatePPEComplianceFromEvents(events: Event[]): PPEComplianceData {
+    // Track unique objects and their PPE status
+    // Use a Map to store the most recent PPE status for each object_id
+    const objectPPEStatus = new Map<number, { hasHelmet: boolean; hasVest: boolean }>();
+
+    events.forEach(event => {
+        // Store or update the PPE status for this object
+        objectPPEStatus.set(event.object_id, {
+            hasHelmet: event.has_helmet,
+            hasVest: event.has_vest
+        });
+    });
+
+    // Now count unique objects by their PPE compliance status
     let compliant = 0;
     let missingHardHat = 0;
     let missingVest = 0;
     let missingBoth = 0;
 
-    events.forEach(event => {
-        if (event.has_helmet && event.has_vest) {
+    objectPPEStatus.forEach(status => {
+        if (status.hasHelmet && status.hasVest) {
             compliant++;
-        } else if (!event.has_helmet && !event.has_vest) {
+        } else if (!status.hasHelmet && !status.hasVest) {
             missingBoth++;
-        } else if (!event.has_helmet) {
+        } else if (!status.hasHelmet) {
             missingHardHat++;
-        } else if (!event.has_vest) {
+        } else if (!status.hasVest) {
             missingVest++;
         }
     });
