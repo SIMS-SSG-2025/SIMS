@@ -12,6 +12,7 @@
     let startDate = $state('');
     let endDate = $state('');
     let error = $state('');
+    let selectedQuickRange = $state<number | null>(null); // Track which quick range is selected (in days)
 
     function formatDateForInput(date: Date): string {
         const year = date.getFullYear();
@@ -30,6 +31,7 @@
             startDate = formatDateForInput(weekAgo);
             endDate = formatDateForInput(today);
             error = '';
+            selectedQuickRange = null; // Reset selection when modal opens
         }
     });
 
@@ -49,15 +51,25 @@
             return;
         }
 
+        // Validate dates before setting time
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDateOnly = new Date(endDate);
+        endDateOnly.setHours(0, 0, 0, 0);
+
         if (start > end) {
             error = 'Start date must be before end date';
             return;
         }
 
-        if (end > new Date()) {
+        if (endDateOnly > today) {
             error = 'End date cannot be in the future';
             return;
         }
+
+        // Set start to beginning of day and end to end of day
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
 
         onApply(start, end);
         onClose();
@@ -68,8 +80,18 @@
         const start = new Date();
         start.setDate(end.getDate() - days);
 
+        // Set to start and end of days for clarity
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+
         startDate = formatDateForInput(start);
         endDate = formatDateForInput(end);
+        selectedQuickRange = days; // Mark this quick range as selected
+    }
+
+    // Clear quick range selection when user manually changes dates
+    function handleDateInputChange() {
+        selectedQuickRange = null;
     }
 </script>
 
@@ -85,25 +107,25 @@
             <div class="flex gap-2 flex-wrap">
                 <button
                     onclick={() => handleQuickSelect(7)}
-                    class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                    class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition border-2 {selectedQuickRange === 7 ? 'border-[#E76A23]' : 'border-transparent'}"
                 >
                     Last 7 days
                 </button>
                 <button
                     onclick={() => handleQuickSelect(14)}
-                    class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                    class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition border-2 {selectedQuickRange === 14 ? 'border-[#E76A23]' : 'border-transparent'}"
                 >
                     Last 14 days
                 </button>
                 <button
                     onclick={() => handleQuickSelect(30)}
-                    class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                    class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition border-2 {selectedQuickRange === 30 ? 'border-[#E76A23]' : 'border-transparent'}"
                 >
                     Last 30 days
                 </button>
                 <button
                     onclick={() => handleQuickSelect(90)}
-                    class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                    class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition border-2 {selectedQuickRange === 90 ? 'border-[#E76A23]' : 'border-transparent'}"
                 >
                     Last 90 days
                 </button>
@@ -120,6 +142,7 @@
                     id="start-date"
                     type="date"
                     bind:value={startDate}
+                    oninput={handleDateInputChange}
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E76A23] focus:border-transparent"
                     max={formatDateForInput(new Date())}
                 />
@@ -133,6 +156,7 @@
                     id="end-date"
                     type="date"
                     bind:value={endDate}
+                    oninput={handleDateInputChange}
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E76A23] focus:border-transparent"
                     max={formatDateForInput(new Date())}
                 />

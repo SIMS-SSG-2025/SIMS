@@ -1,7 +1,7 @@
 <script lang="ts">
     import Modal from "./modal.svelte";
     import { onMount, onDestroy } from "svelte";
-    import { XCircle, AlertTriangle, Info as InfoIcon, CheckCircle, FileText } from 'lucide-svelte';
+    import { CircleX, TriangleAlert, Info as InfoIcon, CircleCheckBig, FileText } from 'lucide-svelte';
 
     export let open: boolean = false;
     export let onClose: () => void = () => {};
@@ -166,7 +166,7 @@
                         class="rounded border-gray-300 text-red-600 focus:ring-red-500"
                     />
                     <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-800">
-                        <XCircle class="w-3 h-3 mr-1" />
+                        <CircleX class="w-3 h-3 mr-1" />
                         ERROR
                     </span>
                 </label>
@@ -178,7 +178,7 @@
                         class="rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
                     />
                     <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-800">
-                        <AlertTriangle class="w-3 h-3 mr-1" />
+                        <TriangleAlert class="w-3 h-3 mr-1" />
                         WARNING
                     </span>
                 </label>
@@ -202,7 +202,7 @@
                         class="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                     />
                     <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-purple-100 text-purple-800">
-                        <CheckCircle class="w-3 h-3 mr-1" />
+                        <CircleCheckBig class="w-3 h-3 mr-1" />
                         DETECTION
                     </span>
                 </label>
