@@ -90,7 +90,8 @@ def receive_zones(zone_data: dict):
 def setup_config(config_data: ConfigData):
     """
     Setup configuration with location and zones.
-    First creates/gets the location, then creates zones with the location_id.
+    First creates/gets the location, then updates/creates zones with the location_id.
+    Zones are matched by name to preserve zone_ids in historical events.
     """
     try:
         # Check if location already exists
@@ -100,8 +101,7 @@ def setup_config(config_data: ConfigData):
             # Create new location and set it as active
             location_id = db_manager.insert_location_and_activate(config_data.locationName)
         else:
-            # Location exists - delete old zones and set as active
-            db_manager.delete_zones_by_location(location_id)
+            # Location exists - upsert zones (update existing, add new, remove deleted)
             db_manager.set_active_location(location_id)
 
         # Handle snapshot renaming if temp snapshot exists
@@ -117,17 +117,16 @@ def setup_config(config_data: ConfigData):
         else:
             logger.warning(f"No snapshot found at {file_path} to rename.")
 
-        # Insert zones for this location
-        zone_count = 0
-        for zone in config_data.zones:
-            db_manager.insert_zone(zone.points, zone.name, location_id)
-            zone_count += 1
+        # Upsert zones for this location (preserves zone_ids for matching names)
+        zones_data = [{"name": zone.name, "points": zone.points} for zone in config_data.zones]
+        zone_ids = db_manager.upsert_zones_for_location(zones_data, location_id)
 
         return {
             "status": "success",
-            "message": f"Configuration setup complete. Location: {config_data.locationName}, Zones: {zone_count}",
+            "message": f"Configuration setup complete. Location: {config_data.locationName}, Zones updated: {len(zone_ids)}",
             "location_id": location_id,
-            "zones_created": zone_count
+            "zones_updated": len(zone_ids),
+            "zone_ids": zone_ids
         }
 
     except Exception as e:
@@ -136,6 +135,7 @@ def setup_config(config_data: ConfigData):
             "status": "error",
             "message": f"Failed to setup configuration: {str(e)}"
         }
+
 
 
 

@@ -579,7 +579,8 @@
     >
         <!-- Modal Content -->
         <div
-            class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col"
+            style="max-height: 95vh;"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.key === 'Escape' && handleClose()}
             role="dialog"
@@ -587,28 +588,28 @@
             tabindex="-1"
         >
             <!-- Header -->
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h2 class="text-2xl font-bold text-gray-800">{initialTitle}</h2>
+            <div class="flex items-center justify-between px-4 xl:px-6 border-b border-gray-200" style="height: 3.5rem; min-height: 3.5rem;">
+                <h2 class="text-xl xl:text-2xl font-bold text-gray-800">{initialTitle}</h2>
                 <button
-                    class="p-2 rounded-full hover:bg-gray-100 transition"
+                    class="p-1.5 xl:p-2 rounded-full hover:bg-gray-100 transition"
                     onclick={handleClose}
                     aria-label="Close modal"
                 >
-                    <X size={24} class="text-gray-600" />
+                    <X size={20} class="xl:w-6 xl:h-6 text-gray-600" />
                 </button>
             </div>
 
             <!-- Content -->
-            <div class="flex-1 overflow-y-auto p-6">
+            <div class="flex-1 overflow-y-auto p-3 xl:p-4" style="max-height: calc(95vh - 3.5rem);">
                 <!-- Controls Section -->
-                <div class="mb-6 space-y-4">
+                <div class="mb-3 space-y-2">
                     <!-- Time Range Selection & Chart Type Toggle -->
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="flex flex-wrap items-center gap-3">
-                            <span class="text-sm font-semibold text-gray-700">Time Period:</span>
+                    <div class="flex flex-wrap items-center justify-between gap-2 xl:gap-3">
+                        <div class="flex flex-wrap items-center gap-2 xl:gap-3">
+                            <span class="text-xs xl:text-sm font-semibold text-gray-700">Time Period:</span>
                             {#each ranges as range}
                                 <button
-                                    class="px-4 py-2 rounded-lg text-sm font-medium transition {selectedRange === range.value
+                                    class="px-3 xl:px-4 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition {selectedRange === range.value
                                         ? 'bg-[#E76A23] text-white shadow-md'
                                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
                                     onclick={() => handleTimeRangeChange(range.value)}
@@ -617,47 +618,47 @@
                                 </button>
                             {/each}
                             {#if selectedRange === 'custom' && customTimeRange}
-                                <span class="flex items-center text-sm text-gray-600 px-3 py-1 bg-orange-50 rounded-full border border-orange-200">
+                                <span class="flex items-center text-xs xl:text-sm text-gray-600 px-2 xl:px-3 py-1 bg-orange-50 rounded-full border border-orange-200">
                                     {customTimeRange.start.toLocaleDateString('sv-SE')} - {customTimeRange.end.toLocaleDateString('sv-SE')}
                                 </span>
                             {/if}
                         </div>
 
                         <!-- Chart Type Toggle Buttons -->
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5 xl:gap-2">
                             <button
-                                class="px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1.5 {currentChartType === 'bar'
+                                class="px-2.5 xl:px-3 py-1 xl:py-1.5 rounded-lg text-xs xl:text-sm font-medium transition flex items-center gap-1 xl:gap-1.5 {currentChartType === 'bar'
                                     ? 'bg-[#E76A23] text-white shadow-md'
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
                                 onclick={() => currentChartType !== 'bar' && toggleChartType()}
                                 title="Bar Chart"
                             >
-                                <BarChart3 size={16} />
+                                <BarChart3 size={14} class="xl:w-4 xl:h-4" />
                             </button>
                             <button
-                                class="px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1.5 {currentChartType === 'line'
+                                class="px-2.5 xl:px-3 py-1 xl:py-1.5 rounded-lg text-xs xl:text-sm font-medium transition flex items-center gap-1 xl:gap-1.5 {currentChartType === 'line'
                                     ? 'bg-[#E76A23] text-white shadow-md'
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
                                 onclick={() => currentChartType !== 'line' && toggleChartType()}
                                 title="Line Chart"
                             >
-                                <LineChart size={16} />
+                                <LineChart size={14} class="xl:w-4 xl:h-4" />
                             </button>
                         </div>
                     </div>
 
                     <!-- Data Series Toggles -->
-                    <div class="flex flex-wrap items-center gap-4">
-                        <span class="text-sm font-semibold text-gray-700">Show Data:</span>
+                    <div class="flex flex-wrap items-center gap-3 xl:gap-4">
+                        <span class="text-xs xl:text-sm font-semibold text-gray-700">Show Data:</span>
 
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
                                 bind:checked={showPersons}
-                                class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                             />
-                            <span class="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                <span class="w-3 h-3 rounded" style="background-color: {colors.persons.border}"></span>
+                            <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
+                                <span class="w-2.5 h-2.5 xl:w-3 xl:h-3 rounded" style="background-color: {colors.persons.border}"></span>
                                 Persons
                             </span>
                         </label>
@@ -666,10 +667,10 @@
                             <input
                                 type="checkbox"
                                 bind:checked={showVehicles}
-                                class="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                                class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
                             />
-                            <span class="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                <span class="w-3 h-3 rounded" style="background-color: {colors.vehicles.border}"></span>
+                            <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
+                                <span class="w-2.5 h-2.5 xl:w-3 xl:h-3 rounded" style="background-color: {colors.vehicles.border}"></span>
                                 Vehicles
                             </span>
                         </label>
@@ -678,10 +679,10 @@
                             <input
                                 type="checkbox"
                                 bind:checked={showPPEBreaches}
-                                class="w-4 h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
+                                class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
                             />
-                            <span class="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                <span class="w-3 h-3 rounded" style="background-color: {colors.ppeBreaches.border}"></span>
+                            <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
+                                <span class="w-2.5 h-2.5 xl:w-3 xl:h-3 rounded" style="background-color: {colors.ppeBreaches.border}"></span>
                                 PPE Breaches
                             </span>
                         </label>
@@ -690,10 +691,10 @@
                             <input
                                 type="checkbox"
                                 bind:checked={showZoneEntries}
-                                class="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-red-500"
+                                class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-red-600 rounded focus:ring-2 focus:ring-red-500"
                             />
-                            <span class="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                <span class="w-3 h-3 rounded" style="background-color: {colors.zoneEntries.border}"></span>
+                            <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
+                                <span class="w-2.5 h-2.5 xl:w-3 xl:h-3 rounded" style="background-color: {colors.zoneEntries.border}"></span>
                                 Zone Entries
                             </span>
                         </label>
@@ -701,12 +702,12 @@
                 </div>
 
                 <!-- Chart Container -->
-                <div class="bg-gray-50 rounded-xl p-6 relative" style="height: 500px;">
+                <div class="bg-gray-50 rounded-xl p-3 xl:p-4 relative" style="height: calc(95vh - 20rem); min-height: 300px;">
                     {#if loading}
                         <div class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 rounded-xl z-10">
                             <div class="text-center">
-                                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E76A23] mx-auto mb-3"></div>
-                                <p class="text-gray-600 font-medium">Loading data...</p>
+                                <div class="animate-spin rounded-full h-10 w-10 xl:h-12 xl:w-12 border-b-2 border-[#E76A23] mx-auto mb-2"></div>
+                                <p class="text-sm text-gray-600 font-medium">Loading data...</p>
                             </div>
                         </div>
                     {/if}
@@ -714,8 +715,8 @@
                 </div>
 
                 <!-- Info Section -->
-                <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p class="text-sm text-blue-800">
+                <div class="mt-3 p-2.5 xl:p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p class="text-xs xl:text-sm text-blue-800">
                         <strong>Tip:</strong> Use the checkboxes above to show/hide different data series.
                         Switch between bar and line chart types using the buttons on the top right.
                     </p>
