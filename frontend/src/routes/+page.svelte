@@ -653,7 +653,7 @@
 
 </script>
 
-<header class="w-full bg-gray-50 py-6 lg:py-8">
+<header class="w-full bg-gray-50 py-4 xl:py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <!-- Left: Tab Navigation -->
         <div class="flex gap-1 lg:gap-2 bg-white p-1 rounded-lg shadow-sm">
@@ -708,7 +708,7 @@
 <main class="bg-gray-50 min-h-screen">
     {#if activeTab === 'dashboard'}
         <!-- Time Range Selector (below header, only for dashboard) -->
-        <div class="py-2 lg:py-3">
+        <div class="py-2 xl:py-3">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap gap-2">
                 {#each ranges as r}
                     <button
@@ -730,9 +730,9 @@
         </div>
 
         <!-- Dashboard Content -->
-        <div class="px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-7xl mx-auto">
+        <div class="px-4 sm:px-6 lg:px-8 py-3 xl:py-6 max-w-7xl mx-auto">
             <!-- Cards Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-4 lg:mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 xl:gap-6 mb-3 xl:mb-6">
         <StatCard
             title="Detected Persons"
             value={stats.detectedPersons}
@@ -763,18 +763,18 @@
     </div>
 
     <!-- Charts Row (2 charts only) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 xl:gap-6">
         <!-- Detection Bar Chart - Persons & Vehicles -->
         <div
-            class="bg-white rounded-2xl shadow p-4 lg:p-6 min-h-[320px] lg:min-h-[350px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
+            class="bg-white rounded-2xl shadow p-3 xl:p-6 min-h-[280px] xl:min-h-[350px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
             onclick={() => openChartModal('Detections Over Time')}
             role="button"
             tabindex="0"
             onkeydown={(e) => e.key === 'Enter' && openChartModal('Detections Over Time')}
         >
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-700">Detections Over Time</h3>
-                <ZoomIn class="w-5 h-5 text-gray-400 group-hover:text-[#E76A23] transition-colors" />
+            <div class="flex items-center justify-between mb-3 xl:mb-4">
+                <h3 class="text-base xl:text-lg font-semibold text-gray-700">Detections Over Time</h3>
+                <ZoomIn class="w-4 h-4 xl:w-5 xl:h-5 text-gray-400 group-hover:text-[#E76A23] transition-colors" />
             </div>
             <div class="flex-1">
                 {#if !isChartDataLoading}
@@ -805,15 +805,15 @@
                 </div>
                 {/if}
             </div>
-            <p class="text-xs text-gray-500 text-center mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+            <p class="text-xs text-gray-500 text-center mt-2 xl:mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 Click to expand and customize
             </p>
         </div>
 
         <!-- PPE Compliance Pie Chart -->
-        <div class="bg-white rounded-2xl shadow p-4 lg:p-6 min-h-[320px] lg:min-h-[350px] flex flex-col">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-700">PPE Compliance Breakdown</h3>
+        <div class="bg-white rounded-2xl shadow p-3 xl:p-6 min-h-[280px] xl:min-h-[350px] flex flex-col">
+            <div class="flex items-center justify-between mb-3 xl:mb-4">
+                <h3 class="text-base xl:text-lg font-semibold text-gray-700">PPE Compliance Breakdown</h3>
             </div>
             <div class="flex-1">
                 <PieChart
