@@ -21,7 +21,7 @@ class EventManager:
         self.class_names = class_names
         self.object_positions = []
         self.ppe_names = ppe_names
-        self.ppe_detector = YOLO('device/training/models/yolo11_ppe_only_v2.pt')
+        self.ppe_detector = YOLO('device/training/models/yolo11_ppe_only_nc2.pt')
 
     def handle_detections(self, tracked_objects, frame, store_obj_pos=False):
         """
@@ -61,13 +61,13 @@ class EventManager:
                 for zone in self.zones:
                     in_zone = self._check_zone(obj["bbox"], zone["coords"])
                     # If an object has entered the zone - Create an event in the database
-                    if in_zone and obj["track_id"] not in self.in_zone_objects:
+                    if in_zone and (obj["track_id"], zone["zone_id"]) not in self.in_zone_objects:
                         self._create_event(obj, zone["zone_id"])
-                        self.in_zone_objects.add(obj["track_id"])
+                        self.in_zone_objects.add((obj["track_id"], zone["zone_id"]))
                         break
                     # If an object leaves the zone - Remove track_id from in_zone_objects
-                    elif not in_zone and obj["track_id"] in self.in_zone_objects:
-                        self.in_zone_objects.remove(obj["track_id"])
+                    elif not in_zone and (obj["track_id"], zone["zone_id"]) in self.in_zone_objects:
+                        self.in_zone_objects.remove((obj["track_id"], zone["zone_id"]))
                         break
 
             if store_obj_pos:
@@ -92,7 +92,7 @@ class EventManager:
 
         self.active_tracks = {obj["track_id"] for obj in tracked_objects}
         self.in_zone_objects = {
-            idx for idx in self.in_zone_objects if idx in self.active_tracks
+            (track_id, zone_id) for (track_id, zone_id) in self.in_zone_objects if track_id in self.active_tracks
         }
         self.tracked_objects_info = {
             track_id: ppe for track_id, ppe in self.tracked_objects_info.items() if track_id in self.active_tracks
