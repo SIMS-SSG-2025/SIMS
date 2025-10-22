@@ -92,7 +92,7 @@
   });
 </script>
 
-<div class="w-full h-full min-h-[220px] xl:min-h-[280px]">
+<div class="w-full h-full">
   <canvas bind:this={canvasElement}></canvas>
 </div>
 

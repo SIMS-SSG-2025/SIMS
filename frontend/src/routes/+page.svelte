@@ -653,8 +653,8 @@
 
 </script>
 
-<header class="w-full bg-gray-50 py-4 xl:py-8">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+<header class="w-full bg-gray-50" style="height: 5rem;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-full">
         <!-- Left: Tab Navigation -->
         <div class="flex gap-1 lg:gap-2 bg-white p-1 rounded-lg shadow-sm">
             <button
@@ -705,10 +705,10 @@
     </Modal>
 
 <!-- MAIN CONTENT -->
-<main class="bg-gray-50 min-h-screen">
+<main class="bg-gray-50" style="min-height: calc(100vh - 5rem);">
     {#if activeTab === 'dashboard'}
         <!-- Time Range Selector (below header, only for dashboard) -->
-        <div class="py-2 xl:py-3">
+        <div class="py-2">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap gap-2">
                 {#each ranges as r}
                     <button
@@ -730,9 +730,9 @@
         </div>
 
         <!-- Dashboard Content -->
-        <div class="px-4 sm:px-6 lg:px-8 py-3 xl:py-6 max-w-7xl mx-auto">
+        <div class="px-4 sm:px-6 lg:px-8 py-2 max-w-7xl mx-auto" style="max-height: calc(100vh - 10rem);">
             <!-- Cards Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 xl:gap-6 mb-3 xl:mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3" style="height: 18vh; min-height: 90px;">
         <StatCard
             title="Detected Persons"
             value={stats.detectedPersons}
@@ -763,10 +763,10 @@
     </div>
 
     <!-- Charts Row (2 charts only) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 xl:gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3" style="height: calc(100vh - 32rem); min-height: 280px;">
         <!-- Detection Bar Chart - Persons & Vehicles -->
         <div
-            class="bg-white rounded-2xl shadow p-3 xl:p-6 min-h-[280px] xl:min-h-[350px] flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group"
+            class="bg-white rounded-2xl shadow p-3 xl:p-6 flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group h-full"
             onclick={() => openChartModal('Detections Over Time')}
             role="button"
             tabindex="0"
@@ -811,7 +811,7 @@
         </div>
 
         <!-- PPE Compliance Pie Chart -->
-        <div class="bg-white rounded-2xl shadow p-3 xl:p-6 min-h-[280px] xl:min-h-[350px] flex flex-col">
+        <div class="bg-white rounded-2xl shadow p-3 xl:p-6 flex flex-col h-full">
             <div class="flex items-center justify-between mb-3 xl:mb-4">
                 <h3 class="text-base xl:text-lg font-semibold text-gray-700">PPE Compliance Breakdown</h3>
             </div>

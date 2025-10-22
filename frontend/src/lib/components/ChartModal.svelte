@@ -579,7 +579,8 @@
     >
         <!-- Modal Content -->
         <div
-            class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] xl:max-h-[90vh] overflow-hidden flex flex-col"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col"
+            style="max-height: 95vh;"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.key === 'Escape' && handleClose()}
             role="dialog"
@@ -587,7 +588,7 @@
             tabindex="-1"
         >
             <!-- Header -->
-            <div class="flex items-center justify-between px-4 xl:px-6 py-3 xl:py-4 border-b border-gray-200">
+            <div class="flex items-center justify-between px-4 xl:px-6 border-b border-gray-200" style="height: 3.5rem; min-height: 3.5rem;">
                 <h2 class="text-xl xl:text-2xl font-bold text-gray-800">{initialTitle}</h2>
                 <button
                     class="p-1.5 xl:p-2 rounded-full hover:bg-gray-100 transition"
@@ -599,9 +600,9 @@
             </div>
 
             <!-- Content -->
-            <div class="flex-1 overflow-y-auto p-3 xl:p-6">
+            <div class="flex-1 overflow-y-auto p-3 xl:p-4" style="max-height: calc(95vh - 3.5rem);">
                 <!-- Controls Section -->
-                <div class="mb-4 xl:mb-6 space-y-3 xl:space-y-4">
+                <div class="mb-3 space-y-2">
                     <!-- Time Range Selection & Chart Type Toggle -->
                     <div class="flex flex-wrap items-center justify-between gap-2 xl:gap-3">
                         <div class="flex flex-wrap items-center gap-2 xl:gap-3">
@@ -701,12 +702,12 @@
                 </div>
 
                 <!-- Chart Container -->
-                <div class="bg-gray-50 rounded-xl p-3 xl:p-6 relative" style="height: 380px;">
+                <div class="bg-gray-50 rounded-xl p-3 xl:p-4 relative" style="height: calc(95vh - 20rem); min-height: 300px;">
                     {#if loading}
                         <div class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 rounded-xl z-10">
                             <div class="text-center">
-                                <div class="animate-spin rounded-full h-10 w-10 xl:h-12 xl:w-12 border-b-2 border-[#E76A23] mx-auto mb-2 xl:mb-3"></div>
-                                <p class="text-sm xl:text-base text-gray-600 font-medium">Loading data...</p>
+                                <div class="animate-spin rounded-full h-10 w-10 xl:h-12 xl:w-12 border-b-2 border-[#E76A23] mx-auto mb-2"></div>
+                                <p class="text-sm text-gray-600 font-medium">Loading data...</p>
                             </div>
                         </div>
                     {/if}
@@ -714,7 +715,7 @@
                 </div>
 
                 <!-- Info Section -->
-                <div class="mt-3 xl:mt-4 p-3 xl:p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div class="mt-3 p-2.5 xl:p-3 bg-blue-50 rounded-lg border border-blue-200">
                     <p class="text-xs xl:text-sm text-blue-800">
                         <strong>Tip:</strong> Use the checkboxes above to show/hide different data series.
                         Switch between bar and line chart types using the buttons on the top right.
