@@ -653,7 +653,7 @@
 
 </script>
 
-<header class="w-full bg-gray-50" style="height: clamp(4rem, 16vh, 16rem);">
+<header class="w-full bg-gray-50" style="height: clamp(4rem, 20vh, 20rem);">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-full">
         <!-- Left: Tab Navigation -->
         <div class="flex gap-1 lg:gap-2 bg-white p-1 rounded-lg shadow-sm">
@@ -732,7 +732,7 @@
         <!-- Dashboard Content -->
         <div class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto" style="padding-top: clamp(0.5rem, 1vh, 1.5rem); padding-bottom: clamp(0.5rem, 1vh, 1.5rem);">
             <!-- Cards Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" style="height: clamp(90px, 16vh, 140px); margin-bottom: clamp(0.5rem, 1.5vh, 1.5rem);">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" style="height: clamp(85px, 14vh, 130px); margin-bottom: clamp(0.75rem, 2vh, 1.5rem);">
         <StatCard
             title="Detected Persons"
             value={stats.detectedPersons}
@@ -763,7 +763,7 @@
     </div>
 
     <!-- Charts Row (2 charts only) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2" style="gap: clamp(0.75rem, 1.5vh, 1.5rem); height: clamp(280px, 38vh, 450px);">
+    <div class="grid grid-cols-1 lg:grid-cols-2" style="gap: clamp(0.75rem, 1.5vh, 1.5rem); height: clamp(260px, 36vh, 430px);">
         <!-- Detection Bar Chart - Persons & Vehicles -->
         <div
             class="bg-white rounded-2xl shadow flex flex-col cursor-pointer hover:shadow-xl transition-shadow duration-200 group h-full"
