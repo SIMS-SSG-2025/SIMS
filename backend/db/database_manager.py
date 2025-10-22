@@ -74,6 +74,76 @@ class DatabaseManager:
         with self.sqlconn:
             self.sqlconn.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
 
+    def update_zone(self, zone_id, points, name):
+        """Update an existing zone's points and name"""
+        with self.sqlconn:
+            cursor = self.sqlconn.cursor()
+            cursor.execute(
+                "UPDATE zones SET coords = ?, name = ? WHERE zone_id = ?",
+                (str(points), name, zone_id)
+            )
+            return cursor.rowcount > 0
+
+    def get_zone_by_name_and_location(self, name, location_id):
+        """Get a zone by name and location_id"""
+        with self.sqlconn:
+            cursor = self.sqlconn.cursor()
+            cursor.execute(
+                "SELECT zone_id, coords, name FROM zones WHERE name = ? AND location_id = ?",
+                (name, location_id)
+            )
+            row = cursor.fetchone()
+            if row:
+                return {"zone_id": row[0], "coords": row[1], "name": row[2]}
+            return None
+
+    def upsert_zones_for_location(self, zones_data, location_id):
+        """
+        Update existing zones or insert new ones for a location.
+        Matches zones by name to preserve zone_ids in events.
+        Returns list of zone_ids created/updated.
+        """
+        zone_ids = []
+
+        # Get existing zones for this location
+        existing_zones = {}
+        with self.sqlconn:
+            cursor = self.sqlconn.cursor()
+            cursor.execute(
+                "SELECT zone_id, name FROM zones WHERE location_id = ?",
+                (location_id,)
+            )
+            for row in cursor.fetchall():
+                existing_zones[row[1]] = row[0]  # name -> zone_id
+
+        # Track which zones we've processed
+        processed_zone_names = set()
+
+        # Update existing zones or insert new ones
+        for zone_data in zones_data:
+            zone_name = zone_data.get("name", "Unnamed Zone")
+            points = zone_data.get("points", [])
+
+            if zone_name in existing_zones:
+                # Update existing zone
+                zone_id = existing_zones[zone_name]
+                self.update_zone(zone_id, points, zone_name)
+                zone_ids.append(zone_id)
+            else:
+                # Insert new zone
+                zone_id = self.insert_zone(points, zone_name, location_id)
+                zone_ids.append(zone_id)
+
+            processed_zone_names.add(zone_name)
+
+        # Delete zones that are no longer in the config
+        for zone_name, zone_id in existing_zones.items():
+            if zone_name not in processed_zone_names:
+                with self.sqlconn:
+                    self.sqlconn.execute("DELETE FROM zones WHERE zone_id = ?", (zone_id,))
+
+        return zone_ids
+
     def delete_location(self, location_id):
         with self.sqlconn:
             self.sqlconn.execute("DELETE FROM zones WHERE location_id = ?", (location_id,))
