@@ -27,6 +27,8 @@
     let zones: Zone[] = [];
     let tempZoneNames: Record<number, string> = {}; // Temporary storage for zone names being edited
     let zoneNameInputs: Record<number, HTMLInputElement> = {}; // References to zone name input elements
+    let currentDrawingPoints: { x: number; y: number }[] = []; // Points currently being drawn
+    let zoneDrawerComponent: any = null; // Reference to ZoneDrawer component
 
     // Stored configuration state
     let storedConfig: Config | null = null;
@@ -809,10 +811,12 @@
                             <div class="border border-gray-300 rounded-lg overflow-hidden bg-gray-50 h-full">
                                 {#if customSnapshotPath}
                                     <ZoneDrawer
+                                        bind:this={zoneDrawerComponent}
                                         onFinishZone={handleFinishZone}
                                         width={1600}
                                         height={900}
                                         bind:zones={zones}
+                                        bind:currentPoints={currentDrawingPoints}
                                         imageSrc={customSnapshotPath}
                                         hideControls={true}
                                     />
@@ -830,6 +834,40 @@
 
                         <!-- Right: Zone List and Instructions -->
                         <div class="w-80 space-y-4 flex-shrink-0">
+                            <!-- Drawing Zone Card (shown when placing points) -->
+                            {#if currentDrawingPoints.length > 0}
+                                <div class="p-3 bg-white border-2 border-gray-400 rounded-lg shadow-sm">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                                            <SquarePen class="w-4 h-4" />
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="text-sm font-semibold text-gray-900">Drawing Zone</div>
+                                            <div class="text-xs text-gray-600">{currentDrawingPoints.length} point{currentDrawingPoints.length !== 1 ? 's' : ''} placed</div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        on:click={() => {
+                                            if (zoneDrawerComponent) {
+                                                zoneDrawerComponent.finishZoneFromExternal();
+                                            }
+                                        }}
+                                        disabled={currentDrawingPoints.length < 3}
+                                        class="w-full px-4 py-2.5 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Check class="w-4 h-4" />
+                                        {#if currentDrawingPoints.length < 3}
+                                            Need {3 - currentDrawingPoints.length} more point{3 - currentDrawingPoints.length !== 1 ? 's' : ''}
+                                        {:else}
+                                            Finish Zone
+                                        {/if}
+                                    </button>
+                                    {#if currentDrawingPoints.length >= 3}
+                                        <p class="text-xs text-gray-500 mt-2 text-center">or press <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-700 font-mono text-xs">Enter</kbd></p>
+                                    {/if}
+                                </div>
+                            {/if}
+
                             <!-- Defined Zones -->
                             <div>
                                 <div class="flex items-center justify-between mb-2">
