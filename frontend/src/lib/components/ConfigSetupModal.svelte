@@ -216,7 +216,7 @@
     const steps = [
         { id: 1, title: "Setup", description: "Choose or create location" },
         { id: 2, title: "Snapshot", description: "Capture camera view" },
-        { id: 3, title: "Zones", description: "Define monitoring zones" },
+        { id: 3, title: "Zones", description: "Define risk zones" },
         { id: 4, title: "Summary", description: "Review configuration" }
     ];
 
@@ -504,13 +504,13 @@
                             </div>
                             <h2 class="text-xl font-semibold text-gray-900 mb-1">{locationName}</h2>
                             <p class="text-sm text-gray-600">
-                                {zones.length} monitoring zone{zones.length !== 1 ? 's' : ''} configured
+                                {zones.length} risk zone{zones.length !== 1 ? 's' : ''} configured
                             </p>
                         </div>
 
                         <!-- Zones List -->
                         <div class="mb-6 flex-1 min-h-0">
-                            <h3 class="text-sm font-semibold text-gray-900 mb-3">Monitoring Zones</h3>
+                            <h3 class="text-sm font-semibold text-gray-900 mb-3">Risk Zones</h3>
                             {#if zones.length > 0}
                                 <div class="space-y-2 max-h-64 overflow-y-auto">
                                     {#each zones as zone, i}

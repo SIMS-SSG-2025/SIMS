@@ -394,3 +394,7 @@ def get_snapshot_by_location(location_id: int):
 @app.get("/events_time")
 def get_events_time(location_id: int, start_date: str, end_date: str):
     return db_manager.get_events_by_date(location_id, start_date, end_date)
+
+@app.get("/object_positions")
+def get_object_positions(location_id: int, start_date: str, end_date: str):
+    return db_manager.get_object_positions_by_date(location_id, start_date, end_date)

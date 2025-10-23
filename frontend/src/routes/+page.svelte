@@ -10,7 +10,7 @@
     import StatCard from "$lib/components/StatCard.svelte";
     import StatCardMulti from "$lib/components/StatCardMulti.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
-    import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
+    import CombinedAreaView from "$lib/components/AreaView.svelte";
     import { onMount } from "svelte";
     import { fetchCurrentConfig, getSystemStatus, type Config } from "$lib/api/config";
     import {
@@ -713,7 +713,7 @@
                         : 'bg-white text-gray-700 hover:bg-gray-50'}"
                 onclick={() => activeTab = 'area'}
             >
-                Area Management
+                Site
             </button>
         </div>
 
@@ -906,35 +906,26 @@
         </div>
     {:else if activeTab === 'area'}
         <!-- Area Management Content -->
-        <div class="px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-7xl mx-auto">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">Area Management</h2>
-            </div>
+        <div class="px-4 sm:px-6 lg:px-8 py-2 max-w-7xl mx-auto -mt-8">
 
-            <!-- Snapshot with Zones -->
-            <div class="bg-white rounded-2xl shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Camera View with Zones</h3>
-                <div class="p-4 flex items-center justify-center bg-gray-100 rounded-lg">
-                    {#if config && config.snapshotPath}
-                        <div class="w-full max-w-4xl max-h-full">
-                            <ZoneDrawer
-                                zones={normalizeZones(config.zones || [], 1920, 1080)}
-                                imageSrc={config.snapshotPath}
-                                width={1200}
-                                height={675}
-                                readOnly={true}
-                                onFinishZone={() => {}}
-                            />
-                        </div>
-                    {:else}
+            {#if config && config.snapshotPath}
+                <CombinedAreaView
+                    locationId={config.locationId}
+                    zones={normalizeZones(config.zones || [], 1920, 1080)}
+                    imageSrc={config.snapshotPath}
+                />
+            {:else}
+                <!-- No Config Available -->
+                <div class="bg-white rounded-2xl shadow p-6">
+                    <div class="p-12 flex items-center justify-center bg-gray-100 rounded-lg">
                         <div class="text-center">
                             <Camera class="h-20 w-20 text-gray-300 mx-auto mb-4" />
-                            <p class="text-gray-500 text-lg font-medium mb-2">No snapshot available</p>
-                            <p class="text-gray-400 text-sm">Configure camera settings to capture a snapshot</p>
+                            <p class="text-gray-500 text-lg font-medium mb-2">No configuration available</p>
+                            <p class="text-gray-400 text-sm">Set up a location and configure zones to view area management</p>
                         </div>
-                    {/if}
+                    </div>
                 </div>
-            </div>
+            {/if}
         </div>
     {/if}
 

@@ -54,6 +54,20 @@ class DatabaseManager:
                 data,
             )
 
+    def get_object_positions_by_date(self, location_id: int, start_date: str, end_date: str):
+        with self.sqlconn:
+            cursor = self.sqlconn.execute(
+                """
+                SELECT * FROM object_positions
+                WHERE location = ? AND DATE(time) BETWEEN ? AND ?
+                ORDER BY time
+                """,
+                (location_id, start_date, end_date),
+            )
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
+
 
     def set_ai_running(self, value: bool):
         with self.sqlconn:
