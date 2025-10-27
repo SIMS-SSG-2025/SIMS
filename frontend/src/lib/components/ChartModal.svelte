@@ -134,7 +134,7 @@
         { label: "This Week", value: "week" },
         { label: "This Month", value: "month" },
         { label: "All", value: "all" },
-        { label: "Custom Date", value: "custom" }
+        { label: "Filter by Date", value: "custom" }
     ];
 
     // Color scheme
