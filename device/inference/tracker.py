@@ -58,17 +58,17 @@ class ReIDEngine:
 class Tracker:
     def __init__(self, class_names, cam_fps, with_reid=True, reid_model="./device/training/models/yolo11n-cls.pt"):
         args = SimpleNamespace(
-            track_buffer=360,
-            track_high_thresh=0.3,
-            track_low_thresh=0.1,
-            new_track_thresh=0.3,
-            match_thresh=0.4,
+            track_buffer=300,
+            track_high_thresh=0.7,
+            track_low_thresh=0.05,
+            new_track_thresh=0.8,
+            match_thresh=0.5,
             fuse_score=True,
             gmc_method="none",
             with_reid=with_reid,
             model=reid_model,
-            proximity_thresh=0.3,
-            appearance_thresh=0.25
+            proximity_thresh=0.35,
+            appearance_thresh=0.2
         )
 
         self.tracker = BOTSORT(args, frame_rate=int(cam_fps))
@@ -84,7 +84,7 @@ class Tracker:
 
         alive_tracks = self.tracker.tracked_stracks + self.tracker.lost_stracks
 
-        frame_age_threshold = 5
+        frame_age_threshold = 30
 
         for track in alive_tracks:
             track_age = current_frame_id - track.start_frame
