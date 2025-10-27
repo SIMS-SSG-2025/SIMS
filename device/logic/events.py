@@ -54,7 +54,7 @@ class EventManager:
                 if obj["class"] == "Person":
                     obj["ppe"] = []
                     for ppe in ppe_detections:
-                        if self.is_ppe_on_person(obj["bbox"], ppe[0]):
+                        if self._is_ppe_on_person(obj["bbox"], ppe[0]):
                             obj["ppe"].append(self.ppe_names[ppe[2]])
                     self.tracked_objects_info[track_id] = obj["ppe"]
 
