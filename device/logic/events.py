@@ -1,8 +1,3 @@
-import os
-
-from torch.jit import last_executed_optimized_graph
-
-from backend.db.database_manager import DatabaseManager
 import datetime
 from ultralytics import YOLO
 from shapely.geometry import Point, Polygon
@@ -87,16 +82,16 @@ class EventManager:
                                 break
                             else:
                                 pass
-                        else:
-                            if state["in_zone"]:
-                                state["in_zone"] = False
-                                state["last_exit"] = now
-                                if zone_key in self.in_zone_objects:
-                                    try:
-                                        self.in_zone_objects.remove(zone_key)
-                                    except KeyError:
-                                        pass
-                                break
+                    else:
+                        if state["in_zone"]:
+                            state["in_zone"] = False
+                            state["last_exit"] = now
+                            if zone_key in self.in_zone_objects:
+                                try:
+                                    self.in_zone_objects.remove(zone_key)
+                                except KeyError:
+                                    pass
+                            break
 
         for obj in in_frame_objects:
             if store_obj_pos:
