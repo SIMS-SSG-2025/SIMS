@@ -10,7 +10,6 @@
     import StatCard from "$lib/components/StatCard.svelte";
     import StatCardMulti from "$lib/components/StatCardMulti.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
-    import CombinedAreaView from "$lib/components/AreaView.svelte";
     import AreaViewCustom from "$lib/components/AreaViewCustom.svelte";
     import { onMount } from "svelte";
     import { fetchCurrentConfig, getSystemStatus, type Config } from "$lib/api/config";
