@@ -1,8 +1,12 @@
 import os
+
+from torch.jit import last_executed_optimized_graph
+
 from backend.db.database_manager import DatabaseManager
 import datetime
 from ultralytics import YOLO
 from shapely.geometry import Point, Polygon
+from shapely.validation import make_valid
 from ..utils.logger import get_logger
 from device.inference.inference import run_inference, run_inference_roi
 
@@ -21,9 +25,12 @@ class EventManager:
         self.class_names = class_names
         self.object_positions = []
         self.ppe_names = ppe_names
-        self.ppe_detector = YOLO('device/training/models/yolo11_ppe_only_nc2.pt')
+        self.vest_detector = YOLO('device/training/models/yolo11_ppe_only_mendelay.pt')
+        self.helmet_detector = YOLO('device/training/models/yolo11_helmet_only.pt')
+        self.zone_states = {}
+        self.ZONE_REENTRY_SECONDS = 2
 
-    def handle_detections(self, tracked_objects, frame, store_obj_pos=False):
+    def handle_detections(self, tracked_objects, in_frame_objects, frame, store_obj_pos=False):
         """
         Handles detections.
         Creates or updates events in DB as needed.
@@ -39,15 +46,16 @@ class EventManager:
             if track_id not in self.active_tracks:
                 # New object detected
                 self.active_tracks.add(track_id)
-                # ppe_detections = run_inference(frame, self.ppe_detector)
-                ppe_detections = run_inference_roi(frame, obj["bbox"], self.ppe_detector)
+                ppe_detections = run_inference_roi(frame, obj["bbox"], self.vest_detector, conf=0.3)
+                ppe_detections_helmet = run_inference_roi(frame, obj["bbox"], self.helmet_detector, conf=0.6)
+                ppe_detections_vest = [det for det in ppe_detections if det[2] != 0] # Keep only vest detections
+                ppe_detections = ppe_detections_helmet + ppe_detections_vest
+
                 if obj["class"] == "Person":
                     obj["ppe"] = []
                     for ppe in ppe_detections:
-                        if self._is_ppe_on_person(obj["bbox"], ppe[0]):
+                        if self.is_ppe_on_person(obj["bbox"], ppe[0]):
                             obj["ppe"].append(self.ppe_names[ppe[2]])
-                        #if self._is_overlapping(obj["bbox"], ppe[0]):
-                        #    obj["ppe"].append(self.class_names[ppe[2]])
                     self.tracked_objects_info[track_id] = obj["ppe"]
 
                 self._create_object(obj)
@@ -58,18 +66,39 @@ class EventManager:
             if self.zones and obj["class"] == "Person":
                 if track_id in self.tracked_objects_info:
                     obj["ppe"] = self.tracked_objects_info[track_id]
-                for zone in self.zones:
-                    in_zone = self._check_zone(obj["bbox"], zone["coords"])
-                    # If an object has entered the zone - Create an event in the database
-                    if in_zone and (obj["track_id"], zone["zone_id"]) not in self.in_zone_objects:
-                        self._create_event(obj, zone["zone_id"])
-                        self.in_zone_objects.add((obj["track_id"], zone["zone_id"]))
-                        break
-                    # If an object leaves the zone - Remove track_id from in_zone_objects
-                    elif not in_zone and (obj["track_id"], zone["zone_id"]) in self.in_zone_objects:
-                        self.in_zone_objects.remove((obj["track_id"], zone["zone_id"]))
-                        break
 
+                now = datetime.datetime.now()
+                for zone in self.zones:
+                    zone_key = (track_id, zone["zone_id"])
+                    in_zone = self._check_zone(obj["bbox"], zone["coords"])
+                    state = self.zone_states.get(zone_key)
+                    if state is None:
+                        state = {"in_zone": False, "last_exit": None}
+                        self.zone_states[zone_key] = state
+
+                    if in_zone:
+                        if not state["in_zone"]:
+                            last_exit = state["last_exit"]
+                            reenter_after = (last_exit is None) or ((now - last_exit).total_seconds() > self.ZONE_REENTRY_SECONDS)
+                            if reenter_after:
+                                self._create_event(obj, zone["zone_id"])
+                                state["in_zone"] = True
+                                self.in_zone_objects.add(zone_key)
+                                break
+                            else:
+                                pass
+                        else:
+                            if state["in_zone"]:
+                                state["in_zone"] = False
+                                state["last_exit"] = now
+                                if zone_key in self.in_zone_objects:
+                                    try:
+                                        self.in_zone_objects.remove(zone_key)
+                                    except KeyError:
+                                        pass
+                                break
+
+        for obj in in_frame_objects:
             if store_obj_pos:
                 timestamp = datetime.datetime.now().isoformat()
                 if obj["class"] == "Person":
@@ -85,7 +114,7 @@ class EventManager:
 
         # Flush buffer and store in db
         if store_obj_pos:
-            if len(self.object_positions) > 100:
+            if len(self.object_positions) > 50:
                 self._insert_object_positions()
                 self.object_positions.clear()
 
@@ -99,31 +128,9 @@ class EventManager:
         }
 
     def _is_ppe_on_person(self, person_bbox, ppe_bbox):
-        cx, cy, _, _ = ppe_bbox
+        cx, cy, w, h = ppe_bbox
+        cy = cy + h/2
         return (person_bbox[0] <= cx <= person_bbox[2]) and (person_bbox[1] <= cy <= person_bbox[3])
-
-    def _is_overlapping(self, bbox1, bbox2, iou_threshold=0.8):
-        """
-        Computes iou and returns true if bbox1 and bbox2 exceeds iou_threshold.
-        bbox: [x1, y1, x2, y2]
-        """
-
-        inter_x1 = max(bbox1[0], bbox2[0])
-        inter_y1 = max(bbox1[1], bbox2[1])
-        inter_x2 = min(bbox1[2], bbox2[2])
-        inter_y2 = min(bbox1[3], bbox2[3])
-
-        area1 = max(0, bbox1[2] - bbox1[0]) * max(0, bbox1[3] - bbox1[1])
-        area2 = max(0, bbox2[2] - bbox2[0]) * max(0, bbox2[3] - bbox2[1])
-
-        inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
-
-        union_area = area1 + area2 - inter_area
-
-        if union_area == 0:
-            return False
-
-        return (inter_area / union_area) >= iou_threshold
 
     def _check_zone(self, bbox, zone):
         x1, y1, x2, y2 = bbox
@@ -131,6 +138,8 @@ class EventManager:
         y_feet = y2
         point = Point(x_center, y_feet)
         polygon = Polygon(zone)
+        if not polygon.is_valid:
+            polygon = make_valid(polygon)
         if polygon.contains(point):
             return True
         return False
@@ -153,8 +162,8 @@ class EventManager:
     def _create_event(self, obj, zone_id=None):
         """ Create an event in the database. """
         try:
-            has_helmet = "Hardhat" in obj.get("ppe", [])
-            has_vest = "Safety Vest" in obj.get("ppe", [])
+            has_helmet = "Helmet" in obj.get("ppe", [])
+            has_vest = "Vest" in obj.get("ppe", [])
 
             event_msg = {
                 "action": "insert_event",
@@ -168,9 +177,9 @@ class EventManager:
 
             safety_status = []
             if has_helmet:
-                safety_status.append("helmet")
+                safety_status.append("Helmet")
             if has_vest:
-                safety_status.append("vest")
+                safety_status.append("Vest")
 
             safety_str = f"with {', '.join(safety_status)}" if safety_status else "without PPE"
             self.logger.info(f"Creating event: Object {obj['track_id']} detected {safety_str}")
@@ -224,7 +233,8 @@ class EventManager:
         return zone_coords
 
     def warmup(self, frame):
-        _ = run_inference(frame, self.ppe_detector)
+        _ = run_inference(frame, self.vest_detector)
+        _ = run_inference(frame, self.helmet_detector)
 
 
     def set_location(self, location_id):

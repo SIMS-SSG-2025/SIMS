@@ -1,12 +1,14 @@
+import cv2
+
 from device.utils.logger import get_logger
 import numpy as np
 logger = get_logger("Inference")
 
 
 
-def run_inference(frame, model, conf=0.5, iou=0.5):
+def run_inference(frame, model, conf=0.3, iou=0.4, imgsz=(640,640)):
     try:
-        results = model.predict(frame, verbose=False, conf=conf, iou=iou)
+        results = model.predict(frame, verbose=False, conf=conf, iou=iou, imgsz=imgsz)
         res = results[0]
 
         detections = []
@@ -28,7 +30,7 @@ def run_inference(frame, model, conf=0.5, iou=0.5):
 
 
 
-def run_inference_roi(frame, bbox, model):
+def run_inference_roi(frame, bbox, model, conf=0.5, iou=0.5):
     h, w = frame.shape[:2]
     x1, y1, x2, y2 = bbox
 
@@ -38,10 +40,10 @@ def run_inference_roi(frame, bbox, model):
 
     bbox_area_ratio = (bw * bh) / (frame.shape[0] * frame.shape[1])
 
-    k = 40  # steepness: higher = sharper transition
-    x0 = 0.008  # midpoint (area ratio where transition starts)
-    max_expand = 3
-    min_expand = 0.5
+    k = 40
+    x0 = 0.008
+    max_expand = 2.5
+    min_expand = 1
     expand_ratio = min_expand + (max_expand - min_expand) / (1 + np.exp(k * (bbox_area_ratio - x0)))
 
     expand_x = int(bh * expand_ratio)
@@ -53,13 +55,35 @@ def run_inference_roi(frame, bbox, model):
     y2_exp = min(h, y2 + expand_y)
 
     roi = frame[y1_exp:y2_exp, x1_exp:x2_exp]
+    orig_h, orig_w = roi.shape[:2]
 
-    roi_detections = run_inference(roi, model, conf=0.3, iou=0.5)
+    if roi.shape[0] > 480 or roi.shape[1] > 640:
+        roi = cv2.resize(roi, (640, 480))
+        scale_x = orig_w / 640
+        scale_y = orig_h / 480
+    else:
+        target_w = int(np.ceil(orig_w / 32) * 32)
+        target_h = int(np.ceil(orig_h / 32) * 32)
+
+        roi = cv2.resize(roi, (target_w, target_h))
+        scale_x = orig_w / target_w
+        scale_y = orig_h / target_h
+
+
+
+
+    roi_detections = run_inference(roi, model, conf=conf, iou=iou, imgsz=(roi.shape[1], roi.shape[0]))
+
 
     # Map back to frame coordinates
     detections = []
     for det in roi_detections:
         (cx, cy, bw, bh), conf, cls = det
+
+        cx = cx * scale_x
+        cy = cy * scale_y
+        bw = bw * scale_x
+        bh = bh * scale_y
 
         cx_global = cx + x1_exp
         cy_global = cy + y1_exp

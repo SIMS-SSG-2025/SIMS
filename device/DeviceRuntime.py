@@ -27,7 +27,7 @@ class DeviceRuntime:
         self.frame_height = None
         self._initialize_components()
         self.frame_count = 0
-        self.FRAME_SAMPLE = 3
+        self.FRAME_SAMPLE = 6
         self.warmup_counter = 0
 
 
@@ -36,7 +36,7 @@ class DeviceRuntime:
         self._load_model()
 
         self.class_names = load_class_mapping("device/training/dataset/yolo11_person_only.yaml")
-        ppe_names = load_class_mapping("device/training/dataset/safety-dataset_ppe_only.yaml")
+        ppe_names = load_class_mapping("device/training/dataset/mendelay_ppe_dataset.yaml")
 
         self.cam = cv2.VideoCapture("./SIMS-iphone14pro_2.mp4")
         if not self.cam.isOpened():
@@ -80,9 +80,9 @@ class DeviceRuntime:
 
                 # Process frame
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                detections = run_inference(rgb_frame, self.model)
+                detections = run_inference(rgb_frame, self.model, conf=0.25, iou=0.5)
                 # Filter detections by class
-                trackable_classes = ["Person", "vehicle"]
+                trackable_classes = ["Person"]
                 detections_for_tracking = [d for d in detections if self.class_names[d[-1]] in trackable_classes]
                 results = DetectionResults(detections_for_tracking)
 
@@ -90,10 +90,10 @@ class DeviceRuntime:
                 tracked_objects, in_frame_objects = self.tracker.update(results, rgb_frame)
 
                 if self.frame_count % self.FRAME_SAMPLE == 0:
-                    self.event_manager.handle_detections(tracked_objects, rgb_frame, store_obj_pos=True)
+                    self.event_manager.handle_detections(tracked_objects, in_frame_objects, rgb_frame, store_obj_pos=True)
                     self.frame_count = 0
                 else:
-                    self.event_manager.handle_detections(tracked_objects, rgb_frame, store_obj_pos=False)
+                    self.event_manager.handle_detections(tracked_objects, in_frame_objects, rgb_frame, store_obj_pos=False)
 
 
                 # Calculate and display FPS
@@ -137,13 +137,10 @@ class DeviceRuntime:
             pass
 
     def _load_model(self):
-        model_config = "device/training/models/yolo11_ppe_cfg.yaml"
         model_path = "device/training/models/yolo11_person_only.pt"
 
         try:
             self.model = YOLO(model_path)
-
-
 
         except Exception as e:
             self.logger.error(f"Failed to load model: {e}")
@@ -200,10 +197,3 @@ class DeviceRuntime:
         except queue.Empty:
             print("No objects fetched.")
 
-
-
-    """
-    # Update the configuration if needed
-    # get zones from db
-    # pass them into eventhandler
-    """
