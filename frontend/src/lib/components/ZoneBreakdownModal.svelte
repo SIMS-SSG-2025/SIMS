@@ -34,8 +34,8 @@
                 <Ban class="h-6 w-6" />
             </div>
             <div>
-                <h2 class="text-xl font-semibold text-gray-800">Risk Zone Entries</h2>
-                <p class="text-sm text-gray-500">Total: {formatNumber(totalEntries)} entries</p>
+                <h2 class="text-xl font-semibold text-gray-800">Risk Zone Violations</h2>
+                <p class="text-sm text-gray-500">Total: {formatNumber(totalEntries)} Violations</p>
             </div>
         </div>
 
@@ -63,7 +63,7 @@
         {:else}
             <div class="text-center py-8 text-gray-400">
                 <Ban class="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No zone entries</p>
+                <p>No zone violations</p>
             </div>
         {/if}
     </div>

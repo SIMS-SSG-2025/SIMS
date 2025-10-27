@@ -17,9 +17,9 @@ export type LocationSummary = {
     zoneCount: number;
 };
 // Jetson
-//export const API_BASE_URL = "http://10.10.67.44:8000";
+export const API_BASE_URL = "http://10.10.67.44:8000";
 // Local
-export const API_BASE_URL = "http://127.0.0.1:8000";
+//export const API_BASE_URL = "http://127.0.0.1:8000";
 
 export async function fetchCurrentConfig(): Promise<Config | null> {
     try {
@@ -195,5 +195,30 @@ export async function activateLocation(locationId: number): Promise<boolean> {
     } catch (error) {
         console.error("Error activating location:", error);
         return false;
+    }
+}
+
+export type ObjectPosition = {
+    object_id: number;
+    location: number;
+    x: number;
+    y: number;
+    time: string;
+};
+
+export async function fetchObjectPositions(
+    locationId: number,
+    startDate: string,
+    endDate: string
+): Promise<ObjectPosition[]> {
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/object_positions?location_id=${locationId}&start_date=${startDate}&end_date=${endDate}`
+        );
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Error fetching object positions:", error);
+        return [];
     }
 }

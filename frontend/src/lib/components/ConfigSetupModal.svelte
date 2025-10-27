@@ -216,7 +216,7 @@
     const steps = [
         { id: 1, title: "Setup", description: "Choose or create location" },
         { id: 2, title: "Snapshot", description: "Capture camera view" },
-        { id: 3, title: "Zones", description: "Define monitoring zones" },
+        { id: 3, title: "Zones", description: "Define risk zones" },
         { id: 4, title: "Summary", description: "Review configuration" }
     ];
 
@@ -504,13 +504,13 @@
                             </div>
                             <h2 class="text-xl font-semibold text-gray-900 mb-1">{locationName}</h2>
                             <p class="text-sm text-gray-600">
-                                {zones.length} monitoring zone{zones.length !== 1 ? 's' : ''} configured
+                                {zones.length} risk zone{zones.length !== 1 ? 's' : ''} configured
                             </p>
                         </div>
 
                         <!-- Zones List -->
                         <div class="mb-6 flex-1 min-h-0">
-                            <h3 class="text-sm font-semibold text-gray-900 mb-3">Monitoring Zones</h3>
+                            <h3 class="text-sm font-semibold text-gray-900 mb-3">Risk Zones</h3>
                             {#if zones.length > 0}
                                 <div class="space-y-2 max-h-64 overflow-y-auto">
                                     {#each zones as zone, i}
@@ -921,7 +921,7 @@
                                                             <X class="w-4 h-4" />
                                                         </button>
                                                     </div>
-                                                    <div class="flex items-center gap-2">
+                                                    <div class="flex items-center gap-2 min-w-0">
                                                         <input
                                                             bind:this={zoneNameInputs[i]}
                                                             type="text"
@@ -930,7 +930,7 @@
                                                                 tempZoneNames[i] = e.currentTarget.value;
                                                             }}
                                                             placeholder="Enter zone name..."
-                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:border-transparent"
+                                                            class="flex-1 min-w-0 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:border-transparent"
                                                             on:keydown={(e) => {
                                                                 if (e.key === 'Enter') {
                                                                     const name = tempZoneNames[i] !== undefined ? tempZoneNames[i] : zone.name;
@@ -952,7 +952,7 @@
                                                                 }
                                                             }}
                                                             disabled={!tempZoneNames[i] && (!zone.name || !zone.name.trim()) || (tempZoneNames[i] !== undefined && !tempZoneNames[i].trim())}
-                                                            class="px-4 py-2 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            class="flex-shrink-0 px-3 py-2 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                         >
                                                             Save
                                                         </button>

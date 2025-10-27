@@ -38,7 +38,7 @@ class DeviceRuntime:
         self.class_names = load_class_mapping("device/training/dataset/yolo11_person_only.yaml")
         ppe_names = load_class_mapping("device/training/dataset/mendelay_ppe_dataset.yaml")
 
-        self.cam = cv2.VideoCapture(0)
+        self.cam = cv2.VideoCapture("./SIMS-iphone14pro_2.mp4")
         if not self.cam.isOpened():
             self.logger.error("Failed to open camera")
             raise RuntimeError("Camera initialization failed")

@@ -459,7 +459,7 @@
 
         if (showZoneEntries) {
             datasets.push({
-                label: 'Zone Entries',
+                label: 'Zone Violations',
                 data: [...zoneEntriesData],
                 backgroundColor: colors.zoneEntries.background,
                 borderColor: colors.zoneEntries.border,
@@ -698,7 +698,7 @@
                                 class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-red-600 rounded focus:ring-2 focus:ring-red-500"
                             />
                             <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
-                                Zone Entries
+                                Zone Violations
                             </span>
                         </label>
                     </div>

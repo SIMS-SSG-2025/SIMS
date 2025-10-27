@@ -7,7 +7,7 @@
         y: number;
     }
 
-    // Props using Svelte 5 $props()
+    // Props
     let {
         onFinishZone,
         width = 640,
@@ -28,7 +28,6 @@
         currentPoints?: { x: number; y: number }[];
     } = $props();
 
-    // Internal state using Svelte 5 $state()
     let showZones = $state(true);
     let canvas = $state<HTMLCanvasElement>();
     let ctx = $state<CanvasRenderingContext2D>();
