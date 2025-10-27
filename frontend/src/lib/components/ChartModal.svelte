@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import { Chart, Title, Tooltip, Legend, BarElement, LineElement, PointElement, CategoryScale, LinearScale, BarController, LineController, Filler } from 'chart.js';
-    import { X, BarChart3, LineChart } from 'lucide-svelte';
+    import { X, ChartColumn, ChartLine } from 'lucide-svelte';
     import type { TimeRangeOption, TimeRange } from '$lib/api/stats';
     import {
         calculateTimeRange,
@@ -19,7 +19,7 @@
     // DATA SOURCE CONFIGURATION
     // ============================================
     // Set this to false to use mock data for charts
-    const USE_REAL_DATA = false;
+    const USE_REAL_DATA = true;
 
     Chart.register(
         Title, Tooltip, Legend,
@@ -130,11 +130,11 @@
     });
 
     const ranges: { label: string; value: TimeRangeOption }[] = [
-        { label: "Day", value: "day" },
-        { label: "Week", value: "week" },
-        { label: "Month", value: "month" },
+        { label: "Today", value: "day" },
+        { label: "This Week", value: "week" },
+        { label: "This Month", value: "month" },
         { label: "All", value: "all" },
-        { label: "Custom", value: "custom" }
+        { label: "Custom Date", value: "custom" }
     ];
 
     // Color scheme
@@ -389,13 +389,20 @@
                     },
                     y: {
                         beginAtZero: true,
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        },
                         ticks: {
+                            stepSize: 1,
+                            callback: function(value) {
+                                if (Number.isInteger(value)) {
+                                    return value;
+                                }
+                                return null;
+                            },
                             font: {
                                 size: 12
                             }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
                         }
                     }
                 }
@@ -452,7 +459,7 @@
 
         if (showZoneEntries) {
             datasets.push({
-                label: 'Zone Entries',
+                label: 'Zone Violations',
                 data: [...zoneEntriesData],
                 backgroundColor: colors.zoneEntries.background,
                 borderColor: colors.zoneEntries.border,
@@ -633,7 +640,7 @@
                                 onclick={() => currentChartType !== 'bar' && toggleChartType()}
                                 title="Bar Chart"
                             >
-                                <BarChart3 size={14} class="xl:w-4 xl:h-4" />
+                                <ChartColumn size={14} class="xl:w-4 xl:h-4" />
                             </button>
                             <button
                                 class="px-2.5 xl:px-3 py-1 xl:py-1.5 rounded-lg text-xs xl:text-sm font-medium transition flex items-center gap-1 xl:gap-1.5 {currentChartType === 'line'
@@ -642,13 +649,13 @@
                                 onclick={() => currentChartType !== 'line' && toggleChartType()}
                                 title="Line Chart"
                             >
-                                <LineChart size={14} class="xl:w-4 xl:h-4" />
+                                <ChartLine size={14} class="xl:w-4 xl:h-4" />
                             </button>
                         </div>
                     </div>
 
                     <!-- Data Series Toggles -->
-                    <div class="flex flex-wrap items-center gap-3 xl:gap-4">
+                    <div class="flex flex-wrap items-center gap-4 xl:gap-5 pt-2">
                         <span class="text-xs xl:text-sm font-semibold text-gray-700">Show Data:</span>
 
                         <label class="flex items-center gap-2 cursor-pointer">
@@ -658,7 +665,6 @@
                                 class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                             />
                             <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
-                                <span class="w-2.5 h-2.5 xl:w-3 xl:h-3 rounded" style="background-color: {colors.persons.border}"></span>
                                 Persons
                             </span>
                         </label>
@@ -670,7 +676,6 @@
                                 class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
                             />
                             <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
-                                <span class="w-2.5 h-2.5 xl:w-3 xl:h-3 rounded" style="background-color: {colors.vehicles.border}"></span>
                                 Vehicles
                             </span>
                         </label>
@@ -682,7 +687,6 @@
                                 class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
                             />
                             <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
-                                <span class="w-2.5 h-2.5 xl:w-3 xl:h-3 rounded" style="background-color: {colors.ppeBreaches.border}"></span>
                                 PPE Breaches
                             </span>
                         </label>
@@ -694,8 +698,7 @@
                                 class="w-3.5 h-3.5 xl:w-4 xl:h-4 text-red-600 rounded focus:ring-2 focus:ring-red-500"
                             />
                             <span class="flex items-center gap-1.5 xl:gap-2 text-xs xl:text-sm font-medium text-gray-700">
-                                <span class="w-2.5 h-2.5 xl:w-3 xl:h-3 rounded" style="background-color: {colors.zoneEntries.border}"></span>
-                                Zone Entries
+                                Zone Violations
                             </span>
                         </label>
                     </div>

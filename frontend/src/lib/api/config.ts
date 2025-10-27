@@ -197,3 +197,28 @@ export async function activateLocation(locationId: number): Promise<boolean> {
         return false;
     }
 }
+
+export type ObjectPosition = {
+    object_id: number;
+    location: number;
+    x: number;
+    y: number;
+    time: string;
+};
+
+export async function fetchObjectPositions(
+    locationId: number,
+    startDate: string,
+    endDate: string
+): Promise<ObjectPosition[]> {
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/object_positions?location_id=${locationId}&start_date=${startDate}&end_date=${endDate}`
+        );
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Error fetching object positions:", error);
+        return [];
+    }
+}

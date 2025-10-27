@@ -57,7 +57,7 @@
     }
 
     async function fetchLogs() {
-        try {
+       /*  try {
             // IP jetson: 10.10.67.44
             const response = await fetch("http://10.10.67.44:8000/logs");
             if (!response.ok) {
@@ -70,7 +70,7 @@
             error = err.message;
         } finally {
             loading = false;
-        }
+        } */
        //loadMockLogs();
     }
 

@@ -50,7 +50,7 @@ def fetch_events():
 @app.get("/snapshot")
 def take_snapshot():
     try:
-        cam = cv2.VideoCapture(0)
+        cam = cv2.VideoCapture("./SIMS-iphone14pro_2.mp4")
         ret, frame = cam.read()
         cam.release()
 
@@ -180,6 +180,8 @@ def start_system():
 def stop_system():
     try:
         db_manager.set_ai_running(False)
+        # Deactivate all locations when stopping the system
+        db_manager.deactivate_all_locations()
         return {"status": "AI stopping"}
     except Exception as e:
         logger.error(f"Failed to stop AI system: {e}")
@@ -392,3 +394,7 @@ def get_snapshot_by_location(location_id: int):
 @app.get("/events_time")
 def get_events_time(location_id: int, start_date: str, end_date: str):
     return db_manager.get_events_by_date(location_id, start_date, end_date)
+
+@app.get("/object_positions")
+def get_object_positions(location_id: int, start_date: str, end_date: str):
+    return db_manager.get_object_positions_by_date(location_id, start_date, end_date)

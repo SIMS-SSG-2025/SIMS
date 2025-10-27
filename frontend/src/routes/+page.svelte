@@ -6,11 +6,13 @@
     import ConfigSetupModal from "$lib/components/ConfigSetupModal.svelte";
     import LogModal from "$lib/components/LogModal.svelte";
     import ChartModal from "$lib/components/ChartModal.svelte";
+    import ZoneBreakdownModal from "$lib/components/ZoneBreakdownModal.svelte";
     import StatCard from "$lib/components/StatCard.svelte";
+    import StatCardMulti from "$lib/components/StatCardMulti.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
-    import ZoneDrawer from "$lib/components/ZoneDrawer.svelte";
+    import AreaViewCustom from "$lib/components/AreaViewCustom.svelte";
     import { onMount } from "svelte";
-    import { fetchCurrentConfig, type Config } from "$lib/api/config";
+    import { fetchCurrentConfig, getSystemStatus, type Config } from "$lib/api/config";
     import {
         type DashboardStats,
         type TimeRangeOption,
@@ -32,17 +34,16 @@
     import { chartPreferences } from "$lib/stores/chartPreferences";
 
     import { Settings, Download, Car, TriangleAlert, Ban, Users, FileText, ZoomIn, SlidersVertical, Camera } from "lucide-svelte";
-
     // ============================================
     // DATA SOURCE CONFIGURATION
     // ============================================
     // Set this to false to use mock data for charts
-    const USE_REAL_DATA = false;
+    const USE_REAL_DATA = true;
 
     let now = $state(new Date());
     let interval: any;
 
-    // Auto-subscribe to chart preferences store using Svelte 5 rune
+    // Auto-subscribe to chart preferences store
     let preferences = $derived($chartPreferences);
     let selectedRange = $state<TimeRangeOption>('week');
     let customTimeRange = $state<TimeRange | null>(null);
@@ -92,6 +93,7 @@
 
     let config = $state<Config | null>(null);
     let configLoading = $state(true);
+    let systemRunning = $state(false);
 
     let stats = $state<DashboardStats>({
         detectedPersons: 0,
@@ -99,9 +101,37 @@
         ppeBreaches: 0,
         helmetBreaches: 0,
         vestBreaches: 0,
-        riskZoneEntries: 0
+        riskZoneEntries: 0,
+        zoneEntryBreakdown: new Map()
     });
     let statsLoading = $state(false);
+
+    // Create zone breakdown items for StatCardMulti
+    let zoneBreakdownItems = $derived(() => {
+        if (!config || !stats.zoneEntryBreakdown) return [];
+
+        const items: Array<{label: string; value: number; color?: string}> = [];
+        const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500'];
+        let colorIndex = 0;
+
+        stats.zoneEntryBreakdown.forEach((count, zoneId) => {
+            // Find zone by ID
+            const zone = config?.zones.find(z => z.zone_id === zoneId);
+
+            // Zone names are now preserved when updating config
+            const zoneName = zone?.name || `Zone ${zoneId}`;
+
+            items.push({
+                label: zoneName,
+                value: count,
+                color: colors[colorIndex % colors.length]
+            });
+            colorIndex++;
+        });
+
+        // Sort by value descending to show most active zones first
+        return items.sort((a, b) => b.value - a.value);
+    });
 
     // Chart data with all 4 series
     let chartLabels = $state<string[]>([]);
@@ -113,7 +143,7 @@
     let isChartDataLoading = $state(false); // Prevent updates during loading
     let earliestEventTime = $state<Date | null>(null); // Store earliest event for "All" time range
 
-    // Control whether chart updates should animate
+    // Control whether chart updates should animate (mostly to prevent animation on polling updates)
     let shouldAnimateCharts = $state(false);
 
     // Dynamically build datasets based on checkbox preferences and chart type
@@ -157,7 +187,7 @@
         }
         if (preferences.showZoneEntries) {
             datasets.push({
-                label: 'Zone Entries',
+                label: 'Zone Violations',
                 data: [...zoneEntriesData], // Break reactivity with spread
                 backgroundColor: 'rgba(239, 68, 68, 0.7)',
                 borderColor: 'rgb(239, 68, 68)',
@@ -246,10 +276,11 @@
         initialLoad();
 
         // Start polling every 5 seconds after initial load (only for real data)
-        pollingInterval = setInterval(() => {
+        pollingInterval = setInterval(async () => {
             if (isInitialLoadComplete && USE_REAL_DATA) {
                 loadStatistics(false, true); // Update stats - force refresh to get new events
                 updateChartDataSilently(); // Update chart data without animation
+                systemRunning = await getSystemStatus(); // Update system status
             }
         }, 5000);
 
@@ -264,9 +295,11 @@
             configLoading = true;
             statsLoading = true;
 
-            // Load configuration first
+            // Load configuration and system status
             config = await fetchCurrentConfig();
+            systemRunning = await getSystemStatus();
             console.log("Loaded config:", $state.snapshot(config));
+            console.log("System running:", systemRunning);
             configLoading = false;
 
             // If we have a location ID, fetch all data in one go
@@ -294,7 +327,6 @@
 
             // Check if we should use mock data
             if (!USE_REAL_DATA) {
-                console.log('🎭 Loading MOCK data in loadDataForLocation...');
                 const mockData = getMockChartModalData(timeRange);
                 const ppeData = await fetchPPEComplianceData();
 
@@ -329,7 +361,6 @@
                 const allEventsResponse = await fetchEventsForLocation(locationId, fallbackRange);
                 if (allEventsResponse.events.length > 0) {
                     earliestEventTime = findEarliestEventTime(allEventsResponse.events);
-                    console.log(`📅 Found earliest event: ${earliestEventTime?.toISOString()}`);
                 }
             }
 
@@ -337,20 +368,19 @@
 
             // Check if we can use cached data
             if (USE_REAL_DATA && useCache && isCacheValid(locationId, timeRange)) {
-                console.log('📦 Using cached events');
+                console.log('Using cached events');
                 events = filterCachedEvents(timeRange);
             } else {
                 // Fetch fresh events from API
                 const eventsResponse = await fetchEventsForLocation(locationId, timeRange);
                 events = eventsResponse.events;
 
-                console.log(`✅ Fetched ${events.length} events from API`);
+                console.log(`Fetched ${events.length} events from API`);
 
                 // Update cache with the broader time range for future use
                 // For day/week, we fetch and cache a month worth of data
                 // For month, we cache the month
                 // For all time, we cache what we get
-                let cacheTimeRange = timeRange;
                 if (selectedRange === 'day' || selectedRange === 'week') {
                     // Cache a month's worth of data when viewing day or week
                     const cacheStart = new Date(timeRange.start);
@@ -374,7 +404,7 @@
                             fetchTime: new Date(),
                             timeRange: { start: cacheStart, end: cacheEnd }
                         };
-                        console.log(`📦 Cached ${broadResponse.events.length} events for month range`);
+                        console.log(`Cached ${broadResponse.events.length} events for month range`);
                         // Filter to requested range
                         events = filterCachedEvents(timeRange);
                     } else {
@@ -396,7 +426,7 @@
                 }
             }
 
-            console.log(`✅ Fetched ${events.length} events from API`);
+            console.log(`Fetched ${events.length} events from API`);
 
             // Calculate all data transformations first (without updating state)
             const newStats = calculateStatsFromEvents(events);
@@ -506,7 +536,7 @@
                 // ============================================
                 // MOCK DATA (Fallback or when USE_REAL_DATA = false)
                 // ============================================
-                console.log('🎭 Loading MOCK data...', {
+                console.log('Loading MOCK data...', {
                     reason: !USE_REAL_DATA ? 'USE_REAL_DATA is false' :
                             !config ? 'No config loaded' :
                             !config.locationId ? 'No locationId in config' :
@@ -570,6 +600,7 @@
     let showLogModal = $state(false);
     let showDateRangePicker = $state(false);
     let showChartModal = $state(false);
+    let showZoneBreakdownModal = $state(false);
     let chartModalTitle = $state('Chart Details');
 
     function openSettingsModal() {
@@ -598,6 +629,12 @@
     function closeDateRangePicker() {
         showDateRangePicker = false;
     }
+    function openZoneBreakdownModal() {
+        showZoneBreakdownModal = true;
+    }
+    function closeZoneBreakdownModal() {
+        showZoneBreakdownModal = false;
+    }
     function handleDateRangeApply(start: Date, end: Date) {
         customTimeRange = { start, end };
         selectedRange = 'custom';
@@ -622,11 +659,11 @@
     }
 
     const ranges: { label: string; value: TimeRangeOption }[] = [
-        { label: "Day", value: "day" },
-        { label: "Week", value: "week" },
-        { label: "Month", value: "month" },
+        { label: "Today", value: "day" },
+        { label: "This Week", value: "week" },
+        { label: "This Month", value: "month" },
         { label: "All", value: "all" },
-        { label: "Custom", value: "custom" }
+        { label: "Custom Date", value: "custom" }
     ];
 
     function selectRange(val: TimeRangeOption) {
@@ -673,12 +710,36 @@
                         : 'bg-white text-gray-700 hover:bg-gray-50'}"
                 onclick={() => activeTab = 'area'}
             >
-                Area Management
+                Site
             </button>
         </div>
 
         <!-- Right: Settings -->
-        <div class="flex items-center gap-1 lg:gap-2">
+        <div class="flex items-center gap-1 lg:gap-3">
+            {#if !config || !systemRunning}
+                <!-- Show setup button if no config or system not running -->
+                <button
+                    class="px-3 lg:px-4 py-1.5 lg:py-2 rounded-lg bg-[#E76A23] text-white hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center gap-2 text-xs lg:text-sm"
+                    onclick={openConfigModal}
+                    aria-label="Setup Configuration"
+                >
+                    <SlidersVertical class="h-4 w-4 lg:h-5 lg:w-5" />
+                    Setup Configuration
+                </button>
+            {:else}
+                <!-- Show running config status -->
+                <button
+                    class="flex items-center gap-2 px-3 lg:px-4 py-1.5 lg:py-2 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition cursor-pointer"
+                    onclick={openConfigModal}
+                    aria-label="View Configuration"
+                >
+                    <div class="relative flex items-center">
+                        <div class="w-2 h-2 lg:w-2.5 lg:h-2.5 bg-green-500 rounded-full animate-pulse"></div>
+                        <div class="absolute w-2 h-2 lg:w-2.5 lg:h-2.5 bg-green-500 rounded-full opacity-75"></div>
+                    </div>
+                    <span class="text-xs lg:text-sm font-medium text-green-900">{config.locationName}</span>
+                </button>
+            {/if}
             <button class="p-1.5 lg:p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
                 <Download size={20} class="lg:w-6 lg:h-6 text-gray-600" />
             </button>
@@ -732,7 +793,7 @@
         <!-- Dashboard Content -->
         <div class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto" style="padding-top: clamp(0.5rem, 1vh, 1.5rem); padding-bottom: clamp(0.5rem, 1vh, 1.5rem);">
             <!-- Cards Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" style="height: clamp(85px, 14vh, 130px); margin-bottom: clamp(1rem, 2.5vh, 2rem);">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4" style="grid-auto-rows: clamp(85px, 14vh, 130px);">
         <StatCard
             title="Detected Persons"
             value={stats.detectedPersons}
@@ -754,11 +815,13 @@
             icon={TriangleAlert}
         />
 
-        <StatCard
-            title="Risk Zone Entries"
-            value={stats.riskZoneEntries}
+        <StatCardMulti
+            title="Risk Zone Violations"
+            totalValue={stats.riskZoneEntries}
+            items={zoneBreakdownItems()}
             iconColor="text-red-600"
             icon={Ban}
+            onclick={openZoneBreakdownModal}
         />
     </div>
 
@@ -840,43 +903,25 @@
         </div>
     {:else if activeTab === 'area'}
         <!-- Area Management Content -->
-        <div class="px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-7xl mx-auto">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">Area Management</h2>
-                <button
-                    class="px-4 py-2 rounded-lg bg-[#E76A23] text-white hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center gap-2"
-                    onclick={openConfigModal}
-                    aria-label="Setup Configuration"
-                >
-                    <SlidersVertical class="h-5 w-5" />
-                    Setup Configuration
-                </button>
-            </div>
+        <div class="px-4 sm:px-6 lg:px-8 py-2 max-w-7xl mx-auto -mt-8">
 
-            <!-- Snapshot with Zones -->
-            <div class="bg-white rounded-2xl shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Camera View with Zones</h3>
-                <div class="p-4 flex items-center justify-center bg-gray-100 rounded-lg">
-                    {#if config && config.snapshotPath}
-                        <div class="w-full max-w-4xl max-h-full">
-                            <ZoneDrawer
-                                zones={normalizeZones(config.zones || [], 1920, 1080)}
-                                imageSrc={config.snapshotPath}
-                                width={1200}
-                                height={675}
-                                readOnly={true}
-                                onFinishZone={() => {}}
-                            />
-                        </div>
-                    {:else}
+            {#if config && config.snapshotPath}
+                <AreaViewCustom
+                    locationId={config.locationId}
+                    zones={normalizeZones(config.zones || [], 1920, 1080)}
+                    imageSrc={config.snapshotPath}
+                />
+            {:else}
+                <!-- No Config Available -->
+                <div class="bg-white rounded-2xl shadow p-6">
+                    <div class="p-12 flex items-center justify-center bg-gray-100 rounded-lg">
                         <div class="text-center">
                             <Camera class="h-20 w-20 text-gray-300 mx-auto mb-4" />
-                            <p class="text-gray-500 text-lg font-medium mb-2">No snapshot available</p>
-                            <p class="text-gray-400 text-sm">Configure camera settings to capture a snapshot</p>
+                            <p class="text-gray-500 text-lg font-medium mb-2">No configuration available</p>
                         </div>
-                    {/if}
+                    </div>
                 </div>
-            </div>
+            {/if}
         </div>
     {/if}
 
@@ -894,6 +939,13 @@
         open={showDateRangePicker}
         onClose={closeDateRangePicker}
         onApply={handleDateRangeApply}
+    />
+
+    <ZoneBreakdownModal
+        open={showZoneBreakdownModal}
+        onClose={closeZoneBreakdownModal}
+        items={zoneBreakdownItems()}
+        totalEntries={stats.riskZoneEntries}
     />
 
     <ChartModal

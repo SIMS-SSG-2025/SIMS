@@ -8,6 +8,7 @@ export interface DashboardStats {
     helmetBreaches: number;
     vestBreaches: number;
     riskZoneEntries: number;
+    zoneEntryBreakdown: Map<number, number>; // zone_id -> count
 }
 
 export interface Event {
@@ -91,12 +92,12 @@ export function calculateTimeRange(option: TimeRangeOption, customRange?: TimeRa
             end.setHours(23, 59, 59, 999);
             break;
         case 'all':
-            // Use earliest event time if provided, otherwise fallback to 2020
+            // Use earliest event time if provided, otherwise fallback to 2025
             if (earliestEventTime) {
                 start = new Date(earliestEventTime);
                 start.setHours(0, 0, 0, 0);
             } else {
-                start = new Date(2020, 0, 1);
+                start = new Date(2025, 0, 1);
             }
             break;
         case 'custom':
@@ -109,11 +110,9 @@ export function calculateTimeRange(option: TimeRangeOption, customRange?: TimeRa
     return { start, end };
 }
 
-/**
- * Find the earliest event timestamp from an array of events
- * @param events - Array of Event objects
- * @returns Date of earliest event, or null if no events
- */
+
+
+// Find the earliest event timestamp from an array of events
 export function findEarliestEventTime(events: Event[]): Date | null {
     if (events.length === 0) return null;
 
@@ -125,13 +124,20 @@ export function findEarliestEventTime(events: Event[]): Date | null {
 // Mock data for development (to be replaced with API calls)
 export function getMockStats(timeRange: TimeRange): DashboardStats {
     // This is placeholder data - will be replaced with actual API call
+    const zoneEntryBreakdown = new Map<number, number>();
+    // Mock some zone entries (zone IDs 1, 2, 3)
+    zoneEntryBreakdown.set(1, Math.floor(Math.random() * 15) + 1);
+    zoneEntryBreakdown.set(2, Math.floor(Math.random() * 10) + 1);
+    const totalEntries = Array.from(zoneEntryBreakdown.values()).reduce((a, b) => a + b, 0);
+
     return {
         detectedPersons: Math.floor(Math.random() * 1000) + 100,
         detectedVehicles: Math.floor(Math.random() * 500) + 50,
         ppeBreaches: Math.floor(Math.random() * 50) + 5,
         helmetBreaches: Math.floor(Math.random() * 30) + 3,
         vestBreaches: Math.floor(Math.random() * 25) + 2,
-        riskZoneEntries: Math.floor(Math.random() * 30) + 2
+        riskZoneEntries: totalEntries,
+        zoneEntryBreakdown
     };
 }
 
@@ -418,6 +424,8 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
     const uniqueVehicles = new Set<number>();
     // Track unique persons with PPE breaches (one breach per person, regardless of what's missing)
     const uniquePPEBreaches = new Set<number>();
+    // Track zone entry breakdown (zone id + count)
+    const zoneEntryBreakdown = new Map<number, number>();
 
     events.forEach(event => {
         // Assuming object_id differentiates between persons and vehicles
@@ -442,10 +450,12 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
             vestBreaches++;
         }
 
-        // Count risk zone entries (this assumes all events are zone entries)
-        // You might want to add a flag in your Event type to distinguish entry types
+        // Count risk zone entries
         if (event.zone_id != null) {
             riskZoneEntries++;
+            // Track which zones were entered
+            const currentCount = zoneEntryBreakdown.get(event.zone_id) || 0;
+            zoneEntryBreakdown.set(event.zone_id, currentCount + 1);
         }
     });
 
@@ -459,7 +469,8 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
         ppeBreaches,
         helmetBreaches,
         vestBreaches,
-        riskZoneEntries: riskZoneEntries
+        riskZoneEntries: riskZoneEntries,
+        zoneEntryBreakdown
     };
 }
 
@@ -469,19 +480,32 @@ export function calculateStatsFromEvents(events: Event[]): DashboardStats {
  * @returns PPEComplianceData object
  */
 export function calculatePPEComplianceFromEvents(events: Event[]): PPEComplianceData {
+    // Track unique objects and their PPE status
+    // Use a Map to store the most recent PPE status for each object_id
+    const objectPPEStatus = new Map<number, { hasHelmet: boolean; hasVest: boolean }>();
+
+    events.forEach(event => {
+        // Store or update the PPE status for this object
+        objectPPEStatus.set(event.object_id, {
+            hasHelmet: event.has_helmet,
+            hasVest: event.has_vest
+        });
+    });
+
+    // Now count unique objects by their PPE compliance status
     let compliant = 0;
     let missingHardHat = 0;
     let missingVest = 0;
     let missingBoth = 0;
 
-    events.forEach(event => {
-        if (event.has_helmet && event.has_vest) {
+    objectPPEStatus.forEach(status => {
+        if (status.hasHelmet && status.hasVest) {
             compliant++;
-        } else if (!event.has_helmet && !event.has_vest) {
+        } else if (!status.hasHelmet && !status.hasVest) {
             missingBoth++;
-        } else if (!event.has_helmet) {
+        } else if (!status.hasHelmet) {
             missingHardHat++;
-        } else if (!event.has_vest) {
+        } else if (!status.hasVest) {
             missingVest++;
         }
     });
@@ -524,11 +548,11 @@ export function createBarChartDataFromEvents(
         for (let i = 0; i < 24; i++) {
             labels.push(`${i}:00`);
             persons.push(hourCounts[i]);
-            vehicles.push(0); // Adjust based on your data
+            vehicles.push(0); // Not tracking vehicles right now
         }
-    } else if (hoursDiff <= 168) {
+    } else if (hoursDiff <= 168) { // 168 hours = 7 days
         // Week view - daily data (Monday to Sunday) with actual dates
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const numDays = 7;
         const dayCounts = new Array(numDays).fill(0);
@@ -558,7 +582,7 @@ export function createBarChartDataFromEvents(
             persons.push(dayCounts[i]);
             vehicles.push(0);
         }
-    } else if (hoursDiff <= 720) {
+    } else if (hoursDiff <= 720) { // Approximately one month
         // Month view - daily data with formatted dates
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const numDays = Math.ceil(hoursDiff / 24);

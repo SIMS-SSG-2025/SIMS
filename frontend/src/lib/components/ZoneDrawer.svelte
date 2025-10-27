@@ -1,44 +1,94 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { Eye, EyeOff, Undo, Check, X } from 'lucide-svelte';
+    import { onMount } from "svelte";
 
-    export let onFinishZone: (points: { x: number; y: number }[], name: string) => void;
-    export let width: number = 640;
-    export let height: number = 360;
-    export let zones: { points: { x: number; y: number }[], name: string }[] = [];
-    export let imageSrc: string = '/snapshot.jpg';
-    export let readOnly: boolean = false;
-
-    // Internal state - managed by ZoneDrawer itself
-    let showZones = true;
-    import { onMount } from "svelte";    interface Point {
+    interface Point {
         x: number;
         y: number;
     }
-    let canvas: HTMLCanvasElement;
-    let ctx: CanvasRenderingContext2D;
-    let img: HTMLImageElement;
-    let container: HTMLDivElement;
-    let renderedWidth = width;
-    let renderedHeight = height;
-    let drawing: boolean = false;
-    let points: Point[] = [];
-    let draggingPointsIndex: number | null = null;
-    let imageAspectRatio = width / height; // Default aspect ratio
 
-    let showNameInput = false;
-    let newZoneName: string = "";
+    // Props
+    let {
+        onFinishZone,
+        width = 640,
+        height = 360,
+        zones = $bindable([]),
+        imageSrc = '/snapshot.jpg',
+        readOnly = false,
+        hideControls = false,
+        currentPoints = $bindable([])
+    }: {
+        onFinishZone: (points: { x: number; y: number }[], name: string) => void;
+        width?: number;
+        height?: number;
+        zones?: { points: { x: number; y: number }[], name: string }[];
+        imageSrc?: string;
+        readOnly?: boolean;
+        hideControls?: boolean;
+        currentPoints?: { x: number; y: number }[];
+    } = $props();
+
+    let showZones = $state(true);
+    let canvas = $state<HTMLCanvasElement>();
+    let ctx = $state<CanvasRenderingContext2D>();
+    let img = $state<HTMLImageElement>();
+    let container = $state<HTMLDivElement>();
+    let renderedWidth = $state(width);
+    let renderedHeight = $state(height);
+    let points = $state<Point[]>([]);
+    let draggingPointsIndex = $state<number | null>(null);
+    let imageAspectRatio = $state(width / height);
+    let showNameInput = $state(false);
+    let newZoneName = $state("");
+    let helperFaded = $state(false);
+
+    // Sync internal points with exported currentPoints using $effect
+    $effect(() => {
+        currentPoints = points;
+    });
+
+    // Redraw effects
+    $effect(() => {
+        if (!readOnly && ctx && img) {
+            redraw();
+        }
+    });
+
+    $effect(() => {
+        if (!readOnly && ctx && img && zones) {
+            redraw();
+        }
+    });
+
+    $effect(() => {
+        if (!readOnly && container && ctx && img) {
+            setTimeout(() => {
+                updateCanvasSize();
+            }, 10);
+        }
+    });
+
+    // Public function to finish zone from external button
+    export function finishZoneFromExternal() {
+        if (readOnly || points.length < 3) return;
+        const normalizedPoints = points.map(p => ({
+            x: p.x / canvas!.width,
+            y: p.y / canvas!.height
+        }));
+        onFinishZone(normalizedPoints, "");
+        points = [];
+        redraw();
+    }
 
     onMount(() => {
-        // Only initialize canvas for interactive mode
-        if (!readOnly) {
+        if (!readOnly && canvas) {
             ctx = canvas.getContext("2d")!;
         }
 
         img = new Image();
         img.src = imageSrc;
         img.onload = () => {
-            // Update aspect ratio based on actual image dimensions
-            imageAspectRatio = img.width / img.height;
+            imageAspectRatio = img!.width / img!.height;
             if (!readOnly) {
                 updateCanvasSize();
                 drawImageContained();
@@ -47,18 +97,19 @@
 
         if (!readOnly) {
             window.addEventListener('resize', updateCanvasSize);
+            window.addEventListener('keydown', handleKeyDown);
         }
 
         return () => {
             if (!readOnly) {
                 window.removeEventListener('resize', updateCanvasSize);
+                window.removeEventListener('keydown', handleKeyDown);
             }
         };
-    })
+    });
 
     function updateCanvasSize() {
-        if (container && img) {
-            // Get the container's size (which matches the image's rendered size)
+        if (container && img && canvas) {
             renderedWidth = container.clientWidth;
             renderedHeight = container.clientHeight;
             canvas.width = renderedWidth;
@@ -69,13 +120,15 @@
     }
 
     function drawImageContained() {
+        if (!ctx || !canvas) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (!img.complete) return;
-        // Fill the entire canvas with the image while maintaining aspect ratio
+        if (!img?.complete) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    }    function getMousePos(event: MouseEvent): Point {
+    }
+
+    function getMousePos(event: MouseEvent): Point {
+        if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
-        // Map mouse position to canvas coordinates
         return {
             x: (event.clientX - rect.left) * (canvas.width / rect.width),
             y: (event.clientY - rect.top) * (canvas.height / rect.height)
@@ -96,9 +149,17 @@
     }
 
     function handleMouseMove(event: MouseEvent): void {
-        if (readOnly) return;
-        const pos = getMousePos(event);
-        const idx = findPointIndex(pos);
+        if (readOnly || !canvas) return;
+
+        // Check if mouse is near the helper area
+        if (hideControls && points.length >= 3) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            helperFaded = (mouseX < 300 && mouseY < 80);
+        }
+
+        const idx = findPointIndex(getMousePos(event));
         if (draggingPointsIndex !== null) {
             const pos = getMousePos(event);
             points[draggingPointsIndex] = pos;
@@ -119,50 +180,72 @@
     }
 
     function handleClick(event: MouseEvent): void {
-        if (readOnly) return;
+        if (readOnly || showNameInput) return;
+
         const pos = getMousePos(event);
-        // Only add a point if not clicking on an existing point
         if (findPointIndex(pos) !== -1) return;
-        points = [...points, {x: pos.x, y: pos.y}];
+
+        points = [...points, { x: pos.x, y: pos.y }];
         points = orderPolygonPoints(points);
-        console.log(points);
         redraw();
     }
 
     function handleUndo(): void {
         if (readOnly) return;
         points.pop();
-        console.log(points);
         showNameInput = false;
         redraw();
     }
 
     function handleFinish(): void {
         if (readOnly) return;
-        if(points.length > 2) {
+        if (points.length > 2) {
             showNameInput = true;
             newZoneName = "";
-        }
-        else {
+        } else {
             alert("A zone must have at least 3 points.");
         }
-
     }
 
     function saveZone() {
-        if (readOnly) return;
+        if (readOnly || !canvas) return;
         const normalizedPoints = points.map(p => ({
-            x: p.x / canvas.width,
-            y: p.y / canvas.height
+            x: p.x / canvas!.width,
+            y: p.y / canvas!.height
         }));
-        console.log("Zone JSON:", JSON.stringify({ points: normalizedPoints }));
         onFinishZone(normalizedPoints, newZoneName || `Zone ${zones.length + 1}`);
         points = [];
         showNameInput = false;
+        newZoneName = "";
         redraw();
     }
 
-    // Zone management functions (moved from parent)
+    function cancelDrawing() {
+        if (readOnly) return;
+        points = [];
+        showNameInput = false;
+        newZoneName = "";
+        redraw();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+        if (!canvas) return;
+
+        if (event.key === 'Escape') {
+            cancelDrawing();
+        } else if (event.key === 'Enter') {
+            if (points.length >= 3) {
+                const normalizedPoints = points.map(p => ({
+                    x: p.x / canvas!.width,
+                    y: p.y / canvas!.height
+                }));
+                onFinishZone(normalizedPoints, "");
+                points = [];
+                redraw();
+            }
+        }
+    }
+
     function toggleZones() {
         showZones = !showZones;
         redraw();
@@ -173,10 +256,11 @@
         redraw();
     }
 
-    function orderPolygonPoints(points: Point[]): Point[] {
-        const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
-        const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-        return [...points].sort((a, b) => {
+    function orderPolygonPoints(pts: Point[]): Point[] {
+        if (pts.length === 0) return pts;
+        const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+        const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+        return [...pts].sort((a, b) => {
             const angleA = Math.atan2(a.y - cy, a.x - cx);
             const angleB = Math.atan2(b.y - cy, b.x - cx);
             return angleA - angleB;
@@ -184,30 +268,31 @@
     }
 
     function redraw(): void {
+        if (!ctx || !canvas) return;
+
         drawImageContained();
 
-        // Always draw existing zones first
+        // Draw existing zones
         if (showZones && zones && zones.length > 0) {
             zones.forEach(zone => {
                 if (zone.points.length >= 3) {
-                    ctx.beginPath();
-                    ctx.moveTo(zone.points[0].x * canvas.width, zone.points[0].y * canvas.height);
+                    ctx!.beginPath();
+                    ctx!.moveTo(zone.points[0].x * canvas!.width, zone.points[0].y * canvas!.height);
                     for (let i = 1; i < zone.points.length; i++) {
-                        ctx.lineTo(zone.points[i].x * canvas.width, zone.points[i].y * canvas.height);
+                        ctx!.lineTo(zone.points[i].x * canvas!.width, zone.points[i].y * canvas!.height);
                     }
-                    ctx.closePath();
-                    ctx.fillStyle = "rgba(0, 123, 255, 0.15)";
-                    ctx.fill();
-                    ctx.strokeStyle = "rgba(0, 123, 255, 0.7)";
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
+                    ctx!.closePath();
+                    ctx!.fillStyle = "rgba(0, 123, 255, 0.15)";
+                    ctx!.fill();
+                    ctx!.strokeStyle = "rgba(0, 123, 255, 0.7)";
+                    ctx!.lineWidth = 2;
+                    ctx!.stroke();
                 }
             });
         }
 
-        // Then draw current drawing points (only in non-readonly mode)
+        // Draw current drawing points
         if (!readOnly && points.length > 0) {
-            // Draw filled polygon if 3+ points
             if (points.length >= 3) {
                 ctx.beginPath();
                 ctx.moveTo(points[0].x, points[0].y);
@@ -217,51 +302,30 @@
                 ctx.closePath();
                 ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
                 ctx.fill();
-
                 ctx.strokeStyle = "red";
                 ctx.lineWidth = 2;
                 ctx.stroke();
             }
 
-            // Draw small blue circles at each point
             points.forEach((pt) => {
-                ctx.beginPath();
-                ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = "blue";
-                ctx.fill();
+                ctx!.beginPath();
+                ctx!.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+                ctx!.fillStyle = "blue";
+                ctx!.fill();
             });
         }
     }
-
-    // Reactive statement to redraw when zones change (only for canvas mode)
-    $: if (!readOnly && ctx && img) {
-        redraw();
-    }
-
-    // Specific reactive statement for zones changes in canvas mode
-    $: if (!readOnly && ctx && img && zones) {
-        redraw();
-    }
-
-    // Handle visibility changes - recalculate canvas when becoming visible
-    $: if (!readOnly && container && ctx && img) {
-        // Small delay to ensure DOM is ready after tab switch
-        setTimeout(() => {
-            updateCanvasSize();
-        }, 10);
-    }
 </script>
 
-<div class="flex flex-col">
-    {#if !readOnly}
+<div class="flex flex-col relative">
+    {#if !readOnly && !hideControls}
         <!-- Control Panel -->
         <div class="bg-white border border-gray-100 p-3 mb-3 shadow-sm">
-            <!-- Top Row: Zone visibility and drawing controls -->
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
                     <button
                         class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-colors"
-                        on:click={toggleZones}
+                        onclick={toggleZones}
                     >
                         {#if showZones}
                             <EyeOff class="w-3 h-3 mr-1" />
@@ -279,7 +343,7 @@
                 <div class="flex items-center gap-1">
                     <button
                         class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-colors disabled:opacity-50"
-                        on:click={handleUndo}
+                        onclick={handleUndo}
                         disabled={points.length === 0}
                         aria-label="Undo last point"
                         type="button"
@@ -289,7 +353,7 @@
                     </button>
                     <button
                         class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        on:click={handleFinish}
+                        onclick={handleFinish}
                         disabled={points.length < 3}
                         aria-label="Finish zone"
                         type="button"
@@ -300,7 +364,7 @@
                 </div>
             </div>
 
-            <!-- Zone Name Input (appears when finishing zone) -->
+            <!-- Zone Name Input -->
             {#if showNameInput}
                 <div class="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
                     <input
@@ -308,12 +372,11 @@
                         bind:value={newZoneName}
                         placeholder="Zone name..."
                         class="flex-1 px-2 py-1 border border-blue-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-transparent"
-                        on:keydown={(e) => { if (e.key === 'Enter') saveZone(); }}
-                        autofocus
+                        onkeydown={(e) => { if (e.key === 'Enter') saveZone(); }}
                     />
                     <button
                         class="px-2 py-1 text-xs font-medium rounded bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-colors"
-                        on:click={saveZone}
+                        onclick={saveZone}
                     >
                         Save
                     </button>
@@ -330,7 +393,7 @@
                                 <button
                                     class="text-blue-500 hover:text-red-500 focus:outline-none transition-colors"
                                     title="Remove zone"
-                                    on:click={() => removeZone(i)}
+                                    onclick={() => removeZone(i)}
                                 >
                                     <X class="w-2.5 h-2.5" />
                                 </button>
@@ -350,7 +413,7 @@
             <!-- SVG overlay for read-only mode -->
             <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index:2;" viewBox="0 0 100 100" preserveAspectRatio="none">
                 {#if showZones && zones && zones.length > 0}
-                    {#each zones as zone, i}
+                    {#each zones as zone}
                         {#if zone.points.length >= 3}
                             <polygon
                                 points={zone.points.map(p => `${p.x * 100},${p.y * 100}`).join(' ')}
@@ -359,12 +422,9 @@
                                 stroke-width="0.4"
                                 vector-effect="non-scaling-stroke"
                             />
-                            <!-- Zone name label -->
                             {#if zone.name}
                                 {@const centerX = zone.points.reduce((sum, p) => sum + p.x, 0) / zone.points.length * 100}
                                 {@const centerY = zone.points.reduce((sum, p) => sum + p.y, 0) / zone.points.length * 100}
-
-                                <!-- Zone name text - centered in zone -->
                                 <text
                                     x={centerX}
                                     y={centerY}
@@ -388,13 +448,26 @@
                 bind:this={canvas}
                 width={renderedWidth}
                 height={renderedHeight}
-                on:click={handleClick}
-                on:mousedown={handleMouseDown}
-                on:mousemove={handleMouseMove}
-                on:mouseup={handleMouseUp}
+                onclick={handleClick}
+                onmousedown={handleMouseDown}
+                onmousemove={handleMouseMove}
+                onmouseup={handleMouseUp}
                 class="absolute inset-0"
                 style="cursor: crosshair; width: 100%; height: 100%; background: transparent; z-index:2;"
             ></canvas>
+
+            <!-- Helper message -->
+            {#if hideControls && points.length >= 3}
+                <div
+                    class="absolute top-4 left-4 bg-[#E76A23] text-white px-4 py-2 rounded-lg shadow-lg transition-opacity duration-200 pointer-events-none"
+                    class:opacity-10={helperFaded}
+                    style="z-index: 50;"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold">Press <kbd class="px-1.5 py-0.5 bg-white/20 rounded text-xs font-mono">Enter</kbd> to complete zone</span>
+                    </div>
+                </div>
+            {/if}
         {/if}
     </div>
 </div>
