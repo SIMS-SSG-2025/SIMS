@@ -77,9 +77,9 @@ class EventManager:
                     y = obj["bbox"][3] # bottom (y2)
                     self.object_positions.append({
                         "object_id": obj["track_id"],
-                        "location": "loc",
-                        "x": x,
-                        "y": y,
+                        "location": self.location,
+                        "x": x / frame.shape[1],
+                        "y": y / frame.shape[0],
                         "time": timestamp,
                     })
 

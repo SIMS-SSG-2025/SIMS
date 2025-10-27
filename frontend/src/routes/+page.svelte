@@ -11,6 +11,7 @@
     import StatCardMulti from "$lib/components/StatCardMulti.svelte";
     import DateRangePicker from "$lib/components/DateRangePicker.svelte";
     import CombinedAreaView from "$lib/components/AreaView.svelte";
+    import AreaViewCustom from "$lib/components/AreaViewCustom.svelte";
     import { onMount } from "svelte";
     import { fetchCurrentConfig, getSystemStatus, type Config } from "$lib/api/config";
     import {
@@ -43,7 +44,7 @@
     let now = $state(new Date());
     let interval: any;
 
-    // Auto-subscribe to chart preferences store using Svelte 5 rune
+    // Auto-subscribe to chart preferences store
     let preferences = $derived($chartPreferences);
     let selectedRange = $state<TimeRangeOption>('week');
     let customTimeRange = $state<TimeRange | null>(null);
@@ -143,7 +144,7 @@
     let isChartDataLoading = $state(false); // Prevent updates during loading
     let earliestEventTime = $state<Date | null>(null); // Store earliest event for "All" time range
 
-    // Control whether chart updates should animate
+    // Control whether chart updates should animate (mostly to prevent animation on polling updates)
     let shouldAnimateCharts = $state(false);
 
     // Dynamically build datasets based on checkbox preferences and chart type
@@ -187,7 +188,7 @@
         }
         if (preferences.showZoneEntries) {
             datasets.push({
-                label: 'Zone Entries',
+                label: 'Zone Violations',
                 data: [...zoneEntriesData], // Break reactivity with spread
                 backgroundColor: 'rgba(239, 68, 68, 0.7)',
                 borderColor: 'rgb(239, 68, 68)',
@@ -327,7 +328,6 @@
 
             // Check if we should use mock data
             if (!USE_REAL_DATA) {
-                console.log('🎭 Loading MOCK data in loadDataForLocation...');
                 const mockData = getMockChartModalData(timeRange);
                 const ppeData = await fetchPPEComplianceData();
 
@@ -362,7 +362,6 @@
                 const allEventsResponse = await fetchEventsForLocation(locationId, fallbackRange);
                 if (allEventsResponse.events.length > 0) {
                     earliestEventTime = findEarliestEventTime(allEventsResponse.events);
-                    console.log(`📅 Found earliest event: ${earliestEventTime?.toISOString()}`);
                 }
             }
 
@@ -370,20 +369,19 @@
 
             // Check if we can use cached data
             if (USE_REAL_DATA && useCache && isCacheValid(locationId, timeRange)) {
-                console.log('📦 Using cached events');
+                console.log('Using cached events');
                 events = filterCachedEvents(timeRange);
             } else {
                 // Fetch fresh events from API
                 const eventsResponse = await fetchEventsForLocation(locationId, timeRange);
                 events = eventsResponse.events;
 
-                console.log(`✅ Fetched ${events.length} events from API`);
+                console.log(`Fetched ${events.length} events from API`);
 
                 // Update cache with the broader time range for future use
                 // For day/week, we fetch and cache a month worth of data
                 // For month, we cache the month
                 // For all time, we cache what we get
-                let cacheTimeRange = timeRange;
                 if (selectedRange === 'day' || selectedRange === 'week') {
                     // Cache a month's worth of data when viewing day or week
                     const cacheStart = new Date(timeRange.start);
@@ -407,7 +405,7 @@
                             fetchTime: new Date(),
                             timeRange: { start: cacheStart, end: cacheEnd }
                         };
-                        console.log(`📦 Cached ${broadResponse.events.length} events for month range`);
+                        console.log(`Cached ${broadResponse.events.length} events for month range`);
                         // Filter to requested range
                         events = filterCachedEvents(timeRange);
                     } else {
@@ -429,7 +427,7 @@
                 }
             }
 
-            console.log(`✅ Fetched ${events.length} events from API`);
+            console.log(`Fetched ${events.length} events from API`);
 
             // Calculate all data transformations first (without updating state)
             const newStats = calculateStatsFromEvents(events);
@@ -539,7 +537,7 @@
                 // ============================================
                 // MOCK DATA (Fallback or when USE_REAL_DATA = false)
                 // ============================================
-                console.log('🎭 Loading MOCK data...', {
+                console.log('Loading MOCK data...', {
                     reason: !USE_REAL_DATA ? 'USE_REAL_DATA is false' :
                             !config ? 'No config loaded' :
                             !config.locationId ? 'No locationId in config' :
@@ -819,7 +817,7 @@
         />
 
         <StatCardMulti
-            title="Risk Zone Entries"
+            title="Risk Zone Violations"
             totalValue={stats.riskZoneEntries}
             items={zoneBreakdownItems()}
             iconColor="text-red-600"
@@ -909,7 +907,7 @@
         <div class="px-4 sm:px-6 lg:px-8 py-2 max-w-7xl mx-auto -mt-8">
 
             {#if config && config.snapshotPath}
-                <CombinedAreaView
+                <AreaViewCustom
                     locationId={config.locationId}
                     zones={normalizeZones(config.zones || [], 1920, 1080)}
                     imageSrc={config.snapshotPath}
@@ -921,7 +919,6 @@
                         <div class="text-center">
                             <Camera class="h-20 w-20 text-gray-300 mx-auto mb-4" />
                             <p class="text-gray-500 text-lg font-medium mb-2">No configuration available</p>
-                            <p class="text-gray-400 text-sm">Set up a location and configure zones to view area management</p>
                         </div>
                     </div>
                 </div>

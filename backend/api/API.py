@@ -50,7 +50,7 @@ def fetch_events():
 @app.get("/snapshot")
 def take_snapshot():
     try:
-        cam = cv2.VideoCapture(0)
+        cam = cv2.VideoCapture("./SIMS-iphone14pro_2.mp4")
         ret, frame = cam.read()
         cam.release()
 

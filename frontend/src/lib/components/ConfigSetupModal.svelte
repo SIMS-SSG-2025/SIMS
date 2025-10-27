@@ -921,7 +921,7 @@
                                                             <X class="w-4 h-4" />
                                                         </button>
                                                     </div>
-                                                    <div class="flex items-center gap-2">
+                                                    <div class="flex items-center gap-2 min-w-0">
                                                         <input
                                                             bind:this={zoneNameInputs[i]}
                                                             type="text"
@@ -930,7 +930,7 @@
                                                                 tempZoneNames[i] = e.currentTarget.value;
                                                             }}
                                                             placeholder="Enter zone name..."
-                                                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:border-transparent"
+                                                            class="flex-1 min-w-0 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:border-transparent"
                                                             on:keydown={(e) => {
                                                                 if (e.key === 'Enter') {
                                                                     const name = tempZoneNames[i] !== undefined ? tempZoneNames[i] : zone.name;
@@ -952,7 +952,7 @@
                                                                 }
                                                             }}
                                                             disabled={!tempZoneNames[i] && (!zone.name || !zone.name.trim()) || (tempZoneNames[i] !== undefined && !tempZoneNames[i].trim())}
-                                                            class="px-4 py-2 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            class="flex-shrink-0 px-3 py-2 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                         >
                                                             Save
                                                         </button>
