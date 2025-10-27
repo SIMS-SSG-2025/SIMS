@@ -72,7 +72,7 @@ class Tracker:
         )
 
         self.tracker = BOTSORT(args, frame_rate=int(cam_fps))
-        self.tracker.encoder = ReIDEngine("device/training/models/yolo11-cls.engine")
+        self.tracker.encoder = ReIDEngine("device/training/models/yolo11n-cls_dynamic.engine")
         self.class_names = class_names
 
     def update(self, detections, frame):
