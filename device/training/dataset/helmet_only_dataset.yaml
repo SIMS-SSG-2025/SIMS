@@ -1,0 +1,6 @@
+train: ./train
+val: ./test
+
+names:
+- Helmet
+nc: 1
