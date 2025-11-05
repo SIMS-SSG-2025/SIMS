@@ -1,4 +1,4 @@
-# SIMS
+# SIMS - SSG - WorkSight
 
 > **Note**: This is a prototype system developed for research and educational purposes.
 
