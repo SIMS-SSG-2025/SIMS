@@ -64,18 +64,9 @@ This starts the AI processing system with camera capture, object detection, and 
 
 **Terminal 3: Start Frontend Dashboard**
 ```powershell
-# Windows PowerShell
 cd frontend
 npm run dev
 ```
-
-```bash
-# Mac/Linux
-cd frontend
-npm run dev
-```
-Dashboard will be available at `http://localhost:5173`
-
 
 ### 3. Initial Configuration
 
