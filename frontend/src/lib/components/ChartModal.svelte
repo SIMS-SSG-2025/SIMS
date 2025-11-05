@@ -100,7 +100,6 @@
         const now = new Date().getTime();
         const cacheAge = now - eventCache.fetchTime.getTime();
         if (cacheAge > CACHE_EXPIRATION_MS) {
-            console.log('⏰ ChartModal: Cache expired, will fetch fresh data');
             return false;
         }
 
@@ -249,7 +248,6 @@
                         };
                     }
                 }
-
 
                 // Transform events into chart data (always creates valid structure even with 0 events)
                 const chartData = createChartDataFromEvents(events, plainTimeRange);

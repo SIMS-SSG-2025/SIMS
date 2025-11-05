@@ -42,12 +42,7 @@
         loading = true;
         try {
             const fetchedPositions = await fetchObjectPositions(locationId, selectedDate, selectedDate);
-            console.log('Fetched movement data:', fetchedPositions);
             positions = fetchedPositions;
-
-            if (fetchedPositions.length === 0) {
-                console.log('No position data available for selected date');
-            }
         } catch (error) {
             console.error('Error loading movement data:', error);
         } finally {

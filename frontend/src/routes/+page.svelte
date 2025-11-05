@@ -291,8 +291,6 @@
             // Load configuration and system status
             config = await fetchCurrentConfig();
             systemRunning = await getSystemStatus();
-            console.log("Loaded config:", $state.snapshot(config));
-            console.log("System running:", systemRunning);
             configLoading = false;
 
             // If we have a location ID, fetch all data in one go
@@ -387,9 +385,6 @@
 
             // Calculate all data transformations first (without updating state)
             const newStats = calculateStatsFromEvents(events);
-            if (isInitialLoad) {
-                console.log("Loaded initial stats from events:", $state.snapshot(newStats));
-            }
 
             const fullChartData = createChartDataFromEvents(events, timeRange);
             const ppeData = calculatePPEComplianceFromEvents(events);
@@ -456,7 +451,6 @@
     async function loadStatistics(isInitialLoad = false, forceRefresh = false) {
 
         if (!config?.locationId) {
-            console.log("No location ID available for stats");
             return;
         }
 

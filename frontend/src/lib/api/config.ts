@@ -118,7 +118,6 @@ export async function saveConfig(locationName: string, zones: Zone[]): Promise<b
         });
 
         const result = await response.json();
-        console.log(result)
         return result.status === "success";
     } catch (error) {
         console.error("Error saving config:", error);

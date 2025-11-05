@@ -89,7 +89,6 @@
             if (!confirmed) return;
 
             await stopSystem();
-            console.log("System stopped for editing");
         }
 
         isEditingExisting = true;
@@ -109,7 +108,6 @@
                 // Stop the system first
                 systemStatusMessage = 'Stopping current monitoring...';
                 await stopSystem();
-                console.log("System stopped, waiting for device polling cycle...");
 
                 // Wait 5 seconds for device to detect the stop
                 systemStatusMessage = 'Waiting for system to stop...';
@@ -127,7 +125,6 @@
                 await loadStoredConfig();
                 await loadAllLocations();
 
-                console.log("Location activated and system started");
                 systemStatusMessage = '';
 
                 // Return to list view to show the new active location
@@ -305,7 +302,6 @@
                 // Stop the system first
                 systemStatusMessage = 'Stopping current monitoring...';
                 await stopSystem();
-                console.log("System stopped, waiting for device polling cycle...");
 
                 // Wait 5 seconds for device to detect the stop
                 systemStatusMessage = 'Waiting for system to stop...';
@@ -317,12 +313,9 @@
             const success = await saveConfig(locationName, zones);
 
             if (success) {
-                console.log("Configuration saved successfully");
-
                 // Start the system with new config
                 systemStatusMessage = 'Starting monitoring with new configuration...';
                 let startResult = await startSystem();
-                console.log("System start response:", startResult);
 
                 systemStatusMessage = 'Monitoring started successfully!';
 

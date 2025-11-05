@@ -75,15 +75,6 @@
             });
         });
 
-        console.log('Movement trails:', {
-            totalPositions: positions.length,
-            uniqueObjects: objectPaths.size,
-            objectPaths: Array.from(objectPaths.entries()).map(([id, path]) => ({
-                objectId: id,
-                points: path.length
-            }))
-        });
-
         // Assign colors to objects
         let colorIndex = 0;
         objectPaths.forEach((path, objectId) => {
