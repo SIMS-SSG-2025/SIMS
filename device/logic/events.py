@@ -12,9 +12,7 @@ class EventManager:
         self.in_zone_objects = set()
         self.zones = None  # Predefined zones can be added here
         self.location = None
-        # db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "db", "events.db")
         self.db_queue = db_queue
-        # self.database = DatabaseManager(db_path=db_path)
         self.logger = logger
         self.detection_logger = get_logger("DETECTION")
         self.class_names = class_names
