@@ -1,6 +1,6 @@
 # SIMS
 
-> **Note**: This is a prototype system developed for research and educational purposes at Mid Sweden University. It is not intended for production use or real-world safety-critical applications without further development, testing, and validation.
+> **Note**: This is a prototype system developed for research and educational purposes.
 
 A real-time AI-powered safety monitoring system that detects persons and vehicles, tracks them across frames, monitors restricted zones, and enforces PPE (Personal Protective Equipment) compliance using YOLO11 object detection models.
 
