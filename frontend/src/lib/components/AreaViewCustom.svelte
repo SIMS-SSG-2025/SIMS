@@ -3,7 +3,6 @@
     import { fetchObjectPositions, type ObjectPosition, type Zone } from '$lib/api/config';
     import MovementTrails from './MovementTrails.svelte';
 
-    // Props
     let {
         locationId,
         zones = [],
@@ -25,9 +24,6 @@
     let imageHeight = $state(1080);
     let movementTrailComponent = $state<any>(null);
 
-    // Computed
-    let positionCount = $derived(positions.length);
-
     onMount(() => {
         img = new Image();
         img.src = imageSrc;
@@ -46,12 +42,7 @@
         loading = true;
         try {
             const fetchedPositions = await fetchObjectPositions(locationId, selectedDate, selectedDate);
-            console.log('Fetched movement data:', fetchedPositions);
             positions = fetchedPositions;
-
-            if (fetchedPositions.length === 0) {
-                console.log('No position data available for selected date');
-            }
         } catch (error) {
             console.error('Error loading movement data:', error);
         } finally {

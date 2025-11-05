@@ -2,76 +2,63 @@
     import Modal from "./modal.svelte";
     import { onMount, onDestroy } from "svelte";
     import { CircleX, TriangleAlert, Info as InfoIcon, CircleCheckBig, FileText } from 'lucide-svelte';
+    import { API_BASE_URL } from "$lib/api/config";
 
-    export let open: boolean = false;
-    export let onClose: () => void = () => {};
+    let {
+        open = $bindable(false),
+        onClose = () => {}
+    }: {
+        open: boolean;
+        onClose: () => void;
+    } = $props();
 
-    let logs: string[] = [];
-    let loading = false;
-    let error: string | null = null;
+    let logs = $state<string[]>([]);
+    let loading = $state(false);
+    let error = $state<string | null>(null);
     let logInterval: any;
 
     // Filter state
-    let filters = {
+    let filters = $state({
         ERROR: true,
         WARNING: true,
         INFO: true,
         DETECTION: true
-    };
+    });
 
     // Computed filtered logs
-    $: filteredLogs = logs.filter(log => {
+    let filteredLogs = $derived(logs.filter(log => {
         const parsedLog = formatLogMessage(log);
 
-        // Check if it's a detection log using the new isDetection property
+        //  detection log
         if (parsedLog.isDetection) {
             return filters.DETECTION;
         }
 
         // Regular log level filtering for ERROR, WARNING, INFO
         return filters[parsedLog.level as keyof typeof filters] !== false;
-    });
-
-    const mockLogs = [
-        "2025-10-09 11:32:45 - DatabaseManager - INFO - Location inserted: ID=1, Name=Makerspace",
-        "2025-10-09 11:32:50 - DeviceRuntime - WARNING - No response received for status check",
-        "2025-10-09 11:32:55 - DatabaseManager - INFO - Connection established successfully",
-        "2025-10-09 11:33:00 - DeviceRuntime - ERROR - Failed to initialize camera module",
-        "2025-10-09 11:33:05 - DETECTION - INFO - Person without helmet detected in Zone A",
-        "2025-10-09 11:33:10 - DeviceRuntime - WARNING - High CPU usage detected: 89%",
-        "2025-10-09 11:33:15 - InferenceEngine - INFO - PPE detection model loaded successfully",
-        "2025-10-09 11:33:20 - DeviceRuntime - ERROR - Network connection timeout",
-        "2025-10-09 11:33:25 - DETECTION - INFO - Safety vest missing for worker ID 123",
-        "2025-10-09 11:33:30 - InferenceEngine - INFO - Processing frame 12345",
-        "2025-10-09 11:33:35 - DeviceRuntime - ERROR - Authentication failed for device registration",
-        "2025-10-09 11:33:40 - DETECTION - INFO - Unauthorized person in restricted area",
-        "2025-10-09 11:33:45 - DatabaseManager - INFO - Zone configuration updated successfully"
-    ];
-
-    function loadMockLogs() {
-        loading = true;
-        setTimeout(() => {
-            logs = [...mockLogs];
-            loading = false;
-        }, 500); // Simulate network delay
-    }
+    }));
 
     async function fetchLogs() {
-       /*  try {
-            // IP jetson: 10.10.67.44
-            const response = await fetch("http://10.10.67.44:8000/logs");
+        try {
+            loading = true;
+            error = null;
+
+            const response = await fetch(`${API_BASE_URL}/logs`);
+
             if (!response.ok) {
-                throw new Error(`Error fetching logs: ${response.statusText}`);
+                throw new Error(`Failed to fetch logs: ${response.statusText}`);
             }
+
             const data = await response.json();
-            console.log(data);
+
             logs = data.logs || [];
-        } catch (err: any) {
-            error = err.message;
+        } catch (err) {
+            console.error('Error fetching logs:', err);
+            error = err instanceof Error ? err.message : 'Failed to fetch logs';
+            // Keep existing logs on error instead of clearing them
         } finally {
             loading = false;
-        } */
-       //loadMockLogs();
+        }
     }
 
     function getLogLevelStyle(log: string): string {
@@ -140,8 +127,8 @@
     }
 
     onMount(() => {
-        logInterval = setInterval(fetchLogs, 5000);
         fetchLogs(); // Initial fetch
+        logInterval = setInterval(fetchLogs, 5000); // Fetch every 5 seconds
     });
 
     onDestroy(() => {
@@ -212,7 +199,7 @@
             <div class="flex gap-2 mt-3 pt-3 border-t border-gray-200">
                 <button
                     class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition"
-                    on:click={() => {
+                    onclick={() => {
                         filters.ERROR = true;
                         filters.WARNING = true;
                         filters.INFO = true;
@@ -223,7 +210,7 @@
                 </button>
                 <button
                     class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition"
-                    on:click={() => {
+                    onclick={() => {
                         filters.ERROR = false;
                         filters.WARNING = false;
                         filters.INFO = false;
@@ -234,7 +221,7 @@
                 </button>
                 <button
                     class="px-3 py-1 text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition"
-                    on:click={() => {
+                    onclick={() => {
                         filters.ERROR = false;
                         filters.WARNING = false;
                         filters.INFO = false;
