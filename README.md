@@ -2,7 +2,7 @@
 
 > **Note**: This is a prototype system developed for research and educational purposes.
 
-A real-time AI-powered safety monitoring system that detects persons and vehicles, tracks them across frames, monitors restricted zones, and enforces PPE (Personal Protective Equipment) compliance using YOLO11 object detection models.
+A real-time AI-powered safety monitoring system that detects persons, tracks them across frames, monitors restricted zones, and enforces PPE (Personal Protective Equipment) compliance using YOLO11 object detection models.
 
 ## Architecture
 
