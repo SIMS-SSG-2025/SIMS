@@ -1,8 +1,8 @@
 # SIMS
 
-> **Note**: This is a prototype system developed for research and educational purposes at Mid Sweden University. It is not intended for production use or real-world safety-critical applications without further development, testing, and validation.
+> **Note**: This is a prototype system developed for research and educational purposes.
 
-A real-time AI-powered safety monitoring system that detects persons and vehicles, tracks them across frames, monitors restricted zones, and enforces PPE (Personal Protective Equipment) compliance using YOLO11 object detection models.
+A real-time AI-powered safety monitoring system that detects persons, tracks them across frames, monitors restricted zones, and enforces PPE (Personal Protective Equipment) compliance using YOLO11 object detection models.
 
 ## Architecture
 
@@ -64,18 +64,9 @@ This starts the AI processing system with camera capture, object detection, and 
 
 **Terminal 3: Start Frontend Dashboard**
 ```powershell
-# Windows PowerShell
 cd frontend
 npm run dev
 ```
-
-```bash
-# Mac/Linux
-cd frontend
-npm run dev
-```
-Dashboard will be available at `http://localhost:5173`
-
 
 ### 3. Initial Configuration
 
