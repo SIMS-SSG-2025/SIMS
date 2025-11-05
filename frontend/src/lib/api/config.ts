@@ -27,6 +27,10 @@ export async function fetchCurrentConfig(): Promise<Config | null> {
         const data = await response.json();
 
         if (data.status === "success" && data.config) {
+            // Add cache-busting timestamp to snapshot path
+            const snapshotUrl = `${API_BASE_URL}${data.config.snapshotPath}`;
+            const cacheBuster = `?t=${Date.now()}`;
+
             return {
                 locationId: data.config.locationId,
                 locationName: data.config.locationName,
@@ -35,7 +39,7 @@ export async function fetchCurrentConfig(): Promise<Config | null> {
                     points: z.coords,
                     name: z.name
                 })),
-                snapshotPath: `${API_BASE_URL}${data.config.snapshotPath}`
+                snapshotPath: `${snapshotUrl}${cacheBuster}`
             };
         }
         return null;
@@ -66,6 +70,10 @@ export async function fetchConfigByLocation(locationId: number): Promise<Config 
         const data = await response.json();
 
         if (data.status === "success" && data.config) {
+            // Add cache-busting timestamp to snapshot path
+            const snapshotUrl = `${API_BASE_URL}${data.config.snapshotPath}`;
+            const cacheBuster = `?t=${Date.now()}`;
+
             return {
                 locationId: data.config.locationId,
                 locationName: data.config.locationName,
@@ -74,7 +82,7 @@ export async function fetchConfigByLocation(locationId: number): Promise<Config 
                     points: z.coords,
                     name: z.name
                 })),
-                snapshotPath: `${API_BASE_URL}${data.config.snapshotPath}`
+                snapshotPath: `${snapshotUrl}${cacheBuster}`
             };
         }
         return null;
@@ -120,7 +128,9 @@ export async function saveConfig(locationName: string, zones: Zone[]): Promise<b
 
 export async function fetchSnapshot() {
     try {
-        const response = await fetch(`${API_BASE_URL}/snapshot`);
+        // Add cache-busting timestamp to prevent browser caching
+        const cacheBuster = `?t=${Date.now()}`;
+        const response = await fetch(`${API_BASE_URL}/snapshot${cacheBuster}`);
         if (!response.ok) {
             throw new Error(`Error fetching snapshot: ${response.statusText}`);
         }

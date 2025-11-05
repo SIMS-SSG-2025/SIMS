@@ -604,10 +604,16 @@
 
 <header class="w-full bg-gray-50" style="height: clamp(4rem, 20vh, 20rem);">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-full">
-        <!-- Left: Tab Navigation -->
-        <div class="flex gap-1 lg:gap-2 bg-white p-1 rounded-lg shadow-sm">
+        <!-- Left: Branding -->
+        <div class="flex items-center gap-3">
+            <img src="/SSG_LOGO.png" alt="SSG Logo" class="h-6 lg:h-8" />
+            <h1 class="text-2xl lg:text-2xl font-bold text-gray-800">WorkSight</h1>
+        </div>
+
+        <!-- Center: Tab Navigation -->
+        <div class="flex gap-1 bg-white p-0.5 lg:p-1 rounded-lg shadow-sm">
             <button
-                class="px-4 lg:px-6 py-1.5 lg:py-2 rounded-md font-semibold transition text-sm lg:text-base
+                class="px-3 lg:px-4 py-1 lg:py-1.5 rounded-md font-semibold transition text-xs lg:text-sm
                     {activeTab === 'dashboard'
                         ? 'bg-[#E76A23] text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-50'}"
@@ -616,7 +622,7 @@
                 Dashboard
             </button>
             <button
-                class="px-4 lg:px-6 py-1.5 lg:py-2 rounded-md font-semibold transition text-sm lg:text-base
+                class="px-3 lg:px-4 py-1 lg:py-1.5 rounded-md font-semibold transition text-xs lg:text-sm
                     {activeTab === 'area'
                         ? 'bg-[#E76A23] text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-50'}"
