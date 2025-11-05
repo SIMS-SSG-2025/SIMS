@@ -17,7 +17,6 @@
         type DashboardStats,
         type TimeRangeOption,
         type TimeRange,
-        type DetectionBarChartData,
         type PPEComplianceData,
         type Event,
         calculateTimeRange,
@@ -25,23 +24,12 @@
         calculateStatsFromEvents,
         calculatePPEComplianceFromEvents,
         createChartDataFromEvents,
-        findEarliestEventTime,
-        fetchDetectionBarChartData,
-        fetchPPEComplianceData,
-        getMockDetectionBarChartData,
-        getMockChartModalData
+        findEarliestEventTime
     } from "$lib/api/stats";
     import { chartPreferences } from "$lib/stores/chartPreferences";
 
     import { Settings, Download, Car, TriangleAlert, Ban, Users, FileText, ZoomIn, SlidersVertical, Camera } from "lucide-svelte";
-    // ============================================
-    // DATA SOURCE CONFIGURATION
-    // ============================================
-    // Set this to false to use mock data for charts
-    const USE_REAL_DATA = true;
 
-    let now = $state(new Date());
-    let interval: any;
 
     // Auto-subscribe to chart preferences store
     let preferences = $derived($chartPreferences);
@@ -118,7 +106,6 @@
             // Find zone by ID
             const zone = config?.zones.find(z => z.zone_id === zoneId);
 
-            // Zone names are now preserved when updating config
             const zoneName = zone?.name || `Zone ${zoneId}`;
 
             items.push({
@@ -232,9 +219,19 @@
     }
     let eventCache = $state<EventCache | null>(null);
 
+    // Cache expiration time (5 minutes)
+    const CACHE_EXPIRATION_MS = 5 * 60 * 1000;
+
     // Check if cached data is still valid for the requested time range
     function isCacheValid(locationId: number, requestedRange: TimeRange): boolean {
         if (!eventCache || eventCache.locationId !== locationId) {
+            return false;
+        }
+
+        // Check if cache has expired
+        const now = new Date().getTime();
+        const cacheAge = now - eventCache.fetchTime.getTime();
+        if (cacheAge > CACHE_EXPIRATION_MS) {
             return false;
         }
 
@@ -268,16 +265,13 @@
     });
 
     onMount(() => {
-        interval = setInterval(() => {
-            now = new Date();
-        }, 1000);
 
         // Start with initial data load
         initialLoad();
 
-        // Start polling every 5 seconds after initial load (only for real data)
+        // Start polling every 5 seconds after initial load
         pollingInterval = setInterval(async () => {
-            if (isInitialLoadComplete && USE_REAL_DATA) {
+            if (isInitialLoadComplete) {
                 loadStatistics(false, true); // Update stats - force refresh to get new events
                 updateChartDataSilently(); // Update chart data without animation
                 systemRunning = await getSystemStatus(); // Update system status
@@ -285,7 +279,6 @@
         }, 5000);
 
         return () => {
-            clearInterval(interval);
             clearInterval(pollingInterval);
         };
     });
@@ -305,10 +298,6 @@
             // If we have a location ID, fetch all data in one go
             if (config && config.locationId) {
                 await loadDataForLocation(config.locationId, true);
-            } else {
-                // No config - just load mock/empty data
-                statsLoading = false;
-                loadChartData(); // Will use mock data
             }
 
             isInitialLoadComplete = true;
@@ -325,37 +314,8 @@
         try {
             const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined, earliestEventTime || undefined);
 
-            // Check if we should use mock data
-            if (!USE_REAL_DATA) {
-                const mockData = getMockChartModalData(timeRange);
-                const ppeData = await fetchPPEComplianceData();
-
-                // Generate mock stats from the mock data
-                const mockStats = {
-                    detectedPersons: Math.floor(Math.random() * 100) + 50,
-                    detectedVehicles: Math.floor(Math.random() * 50) + 20,
-                    ppeBreaches: Math.floor(Math.random() * 30) + 10,
-                    helmetBreaches: Math.floor(Math.random() * 20) + 5,
-                    vestBreaches: Math.floor(Math.random() * 20) + 5,
-                    riskZoneEntries: Math.floor(Math.random() * 40) + 15
-                };
-
-                shouldAnimateCharts = animate;
-                chartLabels = mockData.labels;
-                personsData = mockData.persons;
-                vehiclesData = mockData.vehicles;
-                ppeBreachesData = mockData.ppeBreaches;
-                zoneEntriesData = mockData.zoneEntries;
-                stats = mockStats;
-                ppeComplianceData = ppeData;
-                chartDataVersion++;
-                lastFetchTime = new Date();
-                statsLoading = false;
-                return;
-            }
-
             // If "all" range is selected and we don't have earliest time yet, fetch it first
-            if (selectedRange === 'all' && !earliestEventTime && USE_REAL_DATA) {
+            if (selectedRange === 'all' && !earliestEventTime) {
                 // Fetch with fallback range to get all events
                 const fallbackRange = calculateTimeRange('all', undefined);
                 const allEventsResponse = await fetchEventsForLocation(locationId, fallbackRange);
@@ -365,17 +325,16 @@
             }
 
             let events: Event[];
+            let usedCache = false;
 
             // Check if we can use cached data
-            if (USE_REAL_DATA && useCache && isCacheValid(locationId, timeRange)) {
-                console.log('Using cached events');
+            if (useCache && isCacheValid(locationId, timeRange)) {
                 events = filterCachedEvents(timeRange);
+                usedCache = true;
             } else {
                 // Fetch fresh events from API
                 const eventsResponse = await fetchEventsForLocation(locationId, timeRange);
                 events = eventsResponse.events;
-
-                console.log(`Fetched ${events.length} events from API`);
 
                 // Update cache with the broader time range for future use
                 // For day/week, we fetch and cache a month worth of data
@@ -391,7 +350,7 @@
                     cacheEnd.setDate(0); // Last day of month
                     cacheEnd.setHours(23, 59, 59, 999);
 
-                    // If we're viewing a different range, fetch the broader data
+                    // If we're viewing a different range, fetch the broader data for better caching
                     if (cacheStart.getTime() < timeRange.start.getTime() ||
                         cacheEnd.getTime() > timeRange.end.getTime()) {
                         const broadResponse = await fetchEventsForLocation(locationId, {
@@ -404,7 +363,6 @@
                             fetchTime: new Date(),
                             timeRange: { start: cacheStart, end: cacheEnd }
                         };
-                        console.log(`Cached ${broadResponse.events.length} events for month range`);
                         // Filter to requested range
                         events = filterCachedEvents(timeRange);
                     } else {
@@ -426,7 +384,6 @@
                 }
             }
 
-            console.log(`Fetched ${events.length} events from API`);
 
             // Calculate all data transformations first (without updating state)
             const newStats = calculateStatsFromEvents(events);
@@ -492,23 +449,11 @@
             statsLoading = false;
         } catch (error) {
             console.error("Error loading data:", error);
-            stats = {
-                detectedPersons: 0,
-                detectedVehicles: 0,
-                ppeBreaches: 0,
-                helmetBreaches: 0,
-                vestBreaches: 0,
-                riskZoneEntries: 0
-            };
             statsLoading = false;
         }
     }
 
     async function loadStatistics(isInitialLoad = false, forceRefresh = false) {
-        // Skip polling if using mock data
-        if (!USE_REAL_DATA) {
-            return;
-        }
 
         if (!config?.locationId) {
             console.log("No location ID available for stats");
@@ -529,56 +474,23 @@
             // Enable animations for intentional loads (initial/time period change)
             shouldAnimateCharts = true;
 
-            if (USE_REAL_DATA && config?.locationId) {
+            if (config?.locationId) {
                 // Use the shared data loading function
                 await loadDataForLocation(config.locationId, false, true);
-            } else {
-                // ============================================
-                // MOCK DATA (Fallback or when USE_REAL_DATA = false)
-                // ============================================
-                console.log('Loading MOCK data...', {
-                    reason: !USE_REAL_DATA ? 'USE_REAL_DATA is false' :
-                            !config ? 'No config loaded' :
-                            !config.locationId ? 'No locationId in config' :
-                            'Unknown'
-                });
-
-                const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
-                const mockData = getMockChartModalData(timeRange);
-                const ppeData = await fetchPPEComplianceData();
-
-                // Store all data series
-                chartLabels = mockData.labels;
-                personsData = mockData.persons;
-                vehiclesData = mockData.vehicles;
-                ppeBreachesData = mockData.ppeBreaches;
-                zoneEntriesData = mockData.zoneEntries;
-
-                // PPE compliance data (pie chart) - always show
-                ppeComplianceData = ppeData;
-
-                // Increment version to signal complete data update
-                chartDataVersion++;
             }
         } catch (error) {
             console.error("Error loading chart data:", error);
-            // Fallback to mock data on error
-            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
-            const mockData = getMockChartModalData(timeRange);
-            chartLabels = mockData.labels;
-            personsData = mockData.persons;
-            vehiclesData = mockData.vehicles;
-            ppeBreachesData = mockData.ppeBreaches;
-            zoneEntriesData = mockData.zoneEntries;
+            // Clear chart data on error
+            chartLabels = [];
+            personsData = [];
+            vehiclesData = [];
+            ppeBreachesData = [];
+            zoneEntriesData = [];
         }
     }
 
     // Silent update for polling - updates data without triggering chart reinit/animation
     async function updateChartDataSilently() {
-        // Skip polling if using mock data
-        if (!USE_REAL_DATA) {
-            return;
-        }
 
         if (!config?.locationId) {
             return;

@@ -104,7 +104,3 @@
 <div class="w-full h-full">
   <canvas bind:this={canvasElement}></canvas>
 </div>
-
-<style>
-/* You can use Tailwind instead of writing CSS here, e.g. give classes to the div */
-</style>

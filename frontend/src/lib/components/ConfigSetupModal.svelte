@@ -6,7 +6,6 @@
         fetchCurrentConfig,
         fetchAllLocations,
         fetchConfigByLocation,
-        deleteCurrentConfig,
         deleteLocationConfig,
         saveConfig,
         fetchSnapshot,
@@ -19,39 +18,48 @@
         type LocationSummary
     } from "$lib/api/config";
 
-    export let open: boolean = false;
-    export let onClose: () => void = () => {};
+    // Props
+    let {
+        open = $bindable(false),
+        onClose = () => {}
+    }: {
+        open: boolean;
+        onClose: () => void;
+    } = $props();
 
-    let currentStep = 1;
-    let locationName = "";
-    let zones: Zone[] = [];
-    let tempZoneNames: Record<number, string> = {}; // Temporary storage for zone names being edited
-    let zoneNameInputs: Record<number, HTMLInputElement> = {}; // References to zone name input elements
-    let currentDrawingPoints: { x: number; y: number }[] = []; // Points currently being drawn
-    let zoneDrawerComponent: any = null; // Reference to ZoneDrawer component
+    // State
+    let currentStep = $state(1);
+    let locationName = $state("");
+    let zones = $state<Zone[]>([]);
+    let tempZoneNames = $state<Record<number, string>>({}); // Temporary storage for zone names being edited
+    let zoneNameInputs = $state<Record<number, HTMLInputElement>>({}); // References to zone name input elements
+    let currentDrawingPoints = $state<{ x: number; y: number }[]>([]); // Points currently being drawn
+    let zoneDrawerComponent = $state<any>(null); // Reference to ZoneDrawer component
 
     // Stored configuration state
-    let storedConfig: Config | null = null;
-    let allLocations: LocationSummary[] = [];
-    let selectedLocationId: number | null = null;
-    let isEditingExisting = false;
-    let showNewLocationForm = false;
-    let viewMode: "list" | "view" | "edit" = "list"; // New view mode state
+    let storedConfig = $state<Config | null>(null);
+    let allLocations = $state<LocationSummary[]>([]);
+    let selectedLocationId = $state<number | null>(null);
+    let isEditingExisting = $state(false);
+    let showNewLocationForm = $state(false);
+    let viewMode = $state<"list" | "view" | "edit">("list");
 
     // Snapshot state
-    let snapshotLoading = false;
-    let snapshotError: string | null = null;
-    let customSnapshotPath: string = '';
-    let startingSystem = false;
-    let systemStatusMessage: string = '';
-    let locationsLoading = false;
+    let snapshotLoading = $state(false);
+    let snapshotError = $state<string | null>(null);
+    let customSnapshotPath = $state('');
+    let startingSystem = $state(false);
+    let systemStatusMessage = $state('');
+    let locationsLoading = $state(false);
 
     // Load stored configuration when modal opens
-    $: if (open) {
-        loadStoredConfig();
-        loadAllLocations();
-        viewMode = "list"; // Reset to list view
-    }
+    $effect(() => {
+        if (open) {
+            loadStoredConfig();
+            loadAllLocations();
+            viewMode = "list"; // Reset to list view
+        }
+    });
 
     async function loadStoredConfig() {
         storedConfig = await fetchCurrentConfig();
@@ -182,7 +190,7 @@
                 await stopSystem();
 
                 // Wait a moment for the backend to deactivate the location
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 3000));
 
                 // Reload both stored config and all locations from backend
                 // The backend has deactivated the location, so storedConfig should be null
@@ -335,11 +343,12 @@
         }
     }
 
-    $: canProceedStep1 = locationName.trim().length > 0;
-    $: canProceedStep2 = customSnapshotPath.trim().length > 0;
-    $: canProceedStep3 = zones.length === 0 || zones.every(zone => zone.name && zone.name.trim().length > 0); // All zones must have names
-    $: unnamedZonesCount = zones.filter(zone => !zone.name || zone.name.trim().length === 0).length;
-    $: modalWidth = currentStep === 3 ? 'max-w-7xl' : 'max-w-4xl'; // Larger width for zone drawing step
+    // Computed values
+    let canProceedStep1 = $derived(locationName.trim().length > 0);
+    let canProceedStep2 = $derived(customSnapshotPath.trim().length > 0);
+    let canProceedStep3 = $derived(zones.length === 0 || zones.every(zone => zone.name && zone.name.trim().length > 0)); // All zones must have names
+    let unnamedZonesCount = $derived(zones.filter(zone => !zone.name || zone.name.trim().length === 0).length);
+    let modalWidth = $derived(currentStep === 3 ? 'max-w-7xl' : 'max-w-4xl'); // Larger width for zone drawing step
 
 </script>
 
@@ -361,7 +370,7 @@
                                     : currentStep > step.id
                                         ? 'bg-green-500 text-white'
                                         : 'bg-gray-200 text-gray-600'}"
-                            on:click={() => goToStep(step.id)}
+                            onclick={() => goToStep(step.id)}
                             disabled={step.id > 1 && !canProceedStep1 || step.id > 2 && !canProceedStep2 || step.id > 3 && !canProceedStep3}
                         >
                             {#if currentStep > step.id}
@@ -406,7 +415,7 @@
                             <!-- Current Active Location -->
                             {#if storedConfig}
                                 <button
-                                    on:click={loadExistingConfig}
+                                    onclick={loadExistingConfig}
                                     class="w-full mb-6 p-4 bg-green-50 border-2 border-green-200 rounded-lg hover:bg-green-100 transition-colors cursor-pointer text-left"
                                 >
                                     <div class="flex items-start justify-between">
@@ -435,7 +444,7 @@
                                         {#if !storedConfig || storedConfig.locationId !== location.locationId}
                                             <div class="relative group">
                                                 <button
-                                                    on:click={() => selectLocation(location.locationId)}
+                                                    onclick={() => selectLocation(location.locationId)}
                                                     class="w-full flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-[#E76A23] hover:bg-orange-50 transition-colors cursor-pointer text-left"
                                                 >
                                                     <div class="flex-1">
@@ -448,14 +457,14 @@
                                                 </button>
                                                 <div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 z-10">
                                                     <button
-                                                        on:click|stopPropagation={() => makeLocationActive(location.locationId)}
+                                                        onclick={(e) => { e.stopPropagation(); makeLocationActive(location.locationId); }}
                                                         class="px-3 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
                                                         title="Activate this location"
                                                     >
                                                         Activate
                                                     </button>
                                                     <button
-                                                        on:click|stopPropagation={() => removeSelectedLocation(location.locationId)}
+                                                        onclick={(e) => { e.stopPropagation(); removeSelectedLocation(location.locationId); }}
                                                         class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
                                                         title="Delete this location"
                                                     >
@@ -471,7 +480,7 @@
 
                             <!-- New Location Button -->
                             <button
-                                on:click={startNewLocation}
+                                onclick={startNewLocation}
                                 class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#E76A23] hover:bg-orange-50 transition-colors group"
                             >
                                 <div class="flex items-center justify-center gap-2">
@@ -490,7 +499,7 @@
                         <!-- Header with Back Button -->
                         <div class="mb-6">
                             <button
-                                on:click={backToList}
+                                onclick={backToList}
                                 class="mb-4 px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
                             >
                                 <ArrowLeft class="w-4 h-4 inline mr-1" />
@@ -534,7 +543,7 @@
                         <div class="space-y-2 flex-shrink-0">
                             {#if !storedConfig || selectedLocationId !== storedConfig.locationId}
                                 <button
-                                    on:click={() => makeLocationActive(selectedLocationId!)}
+                                    onclick={() => makeLocationActive(selectedLocationId!)}
                                     disabled={startingSystem}
                                     class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
@@ -548,7 +557,7 @@
                                 </button>
                             {/if}
                             <button
-                                on:click={editLocation}
+                                onclick={editLocation}
                                 class="w-full px-4 py-3 bg-[#E76A23] text-white rounded-lg hover:bg-[#d15e1e] transition font-medium shadow-sm flex items-center justify-center gap-2"
                             >
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -559,7 +568,7 @@
                             {#if storedConfig && selectedLocationId === storedConfig.locationId}
                                 <!-- Stop button for active location -->
                                 <button
-                                    on:click={handleStopSystem}
+                                    onclick={handleStopSystem}
                                     disabled={startingSystem}
                                     class="w-full px-4 py-3 border border-orange-700 bg-white text-orange-700 rounded-lg hover:bg-red-50 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
@@ -574,7 +583,7 @@
                             {:else}
                                 <!-- Delete button for non-active location -->
                                 <button
-                                    on:click={() => removeSelectedLocation(selectedLocationId!)}
+                                    onclick={() => removeSelectedLocation(selectedLocationId!)}
                                     class="w-full px-4 py-3 border border-red-300 bg-white text-red-700 rounded-lg hover:bg-red-50 transition font-medium flex items-center justify-center gap-2"
                                 >
                                     <Trash2 class="w-5 h-5" />
@@ -619,7 +628,7 @@
                             <!-- Current Active Location -->
                             {#if storedConfig}
                                 <button
-                                    on:click={loadExistingConfig}
+                                    onclick={loadExistingConfig}
                                     class="w-full mb-6 p-4 bg-orange-50 border-2 border-orange-200 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer text-left"
                                 >
                                     <div class="flex items-start justify-between">
@@ -646,7 +655,7 @@
                                             {#if !storedConfig || storedConfig.locationId !== location.locationId}
                                                 <div class="relative group">
                                                     <button
-                                                        on:click={() => selectLocation(location.locationId)}
+                                                        onclick={() => selectLocation(location.locationId)}
                                                         class="w-full flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-[#E76A23] hover:bg-orange-50 transition-colors cursor-pointer text-left"
                                                     >
                                                         <div class="flex-1">
@@ -659,7 +668,7 @@
                                                     </button>
                                                     <div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 z-10">
                                                         <button
-                                                            on:click|stopPropagation={() => removeSelectedLocation(location.locationId)}
+                                                            onclick={(e) => { e.stopPropagation(); removeSelectedLocation(location.locationId); }}
                                                             class="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
                                                             title="Delete this location"
                                                         >
@@ -675,7 +684,7 @@
 
                             <!-- New Location Button -->
                             <button
-                                on:click={startNewLocation}
+                                onclick={startNewLocation}
                                 class="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#E76A23] hover:bg-orange-50 transition-colors group"
                             >
                                 <div class="flex items-center justify-center gap-2">
@@ -736,7 +745,7 @@
                                             <span class="text-sm font-semibold text-green-900">Snapshot Captured Successfully</span>
                                         </div>
                                         <button
-                                            on:click={loadSnapshot}
+                                            onclick={loadSnapshot}
                                             disabled={snapshotLoading}
                                             class="px-4 py-1.5 text-xs font-medium rounded-md border-2 border-[#E76A23] text-[#E76A23] hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
@@ -762,7 +771,7 @@
                                 </div>
 
                                 <button
-                                    on:click={loadSnapshot}
+                                    onclick={loadSnapshot}
                                     disabled={snapshotLoading || !locationName.trim()}
                                     class="px-8 py-3 text-base font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
@@ -847,7 +856,7 @@
                                         </div>
                                     </div>
                                     <button
-                                        on:click={() => {
+                                        onclick={() => {
                                             if (zoneDrawerComponent) {
                                                 zoneDrawerComponent.finishZoneFromExternal();
                                             }
@@ -892,7 +901,7 @@
                                                         <div class="text-xs text-gray-500">{zone.points.length} points</div>
                                                     </div>
                                                     <button
-                                                        on:click={() => {
+                                                        onclick={() => {
                                                             zones = zones.filter((_, index) => index !== i);
                                                         }}
                                                         class="text-gray-400 hover:text-red-500 transition-colors p-1"
@@ -912,7 +921,7 @@
                                                             {zone.points.length} points
                                                         </div>
                                                         <button
-                                                            on:click={() => {
+                                                            onclick={() => {
                                                                 zones = zones.filter((_, index) => index !== i);
                                                             }}
                                                             class="text-gray-400 hover:text-red-500 transition-colors p-1"
@@ -926,12 +935,12 @@
                                                             bind:this={zoneNameInputs[i]}
                                                             type="text"
                                                             value={tempZoneNames[i] !== undefined ? tempZoneNames[i] : zone.name}
-                                                            on:input={(e) => {
+                                                            oninput={(e) => {
                                                                 tempZoneNames[i] = e.currentTarget.value;
                                                             }}
                                                             placeholder="Enter zone name..."
                                                             class="flex-1 min-w-0 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:border-transparent"
-                                                            on:keydown={(e) => {
+                                                            onkeydown={(e) => {
                                                                 if (e.key === 'Enter') {
                                                                     const name = tempZoneNames[i] !== undefined ? tempZoneNames[i] : zone.name;
                                                                     if (name && name.trim()) {
@@ -943,7 +952,7 @@
                                                             }}
                                                         />
                                                         <button
-                                                            on:click={() => {
+                                                            onclick={() => {
                                                                 const name = tempZoneNames[i] !== undefined ? tempZoneNames[i] : zone.name;
                                                                 if (name && name.trim()) {
                                                                     zone.name = name.trim();
@@ -1068,7 +1077,7 @@
             <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex-shrink-0">
                 <div class="flex items-center justify-between">
                     <button
-                        on:click={prevStep}
+                        onclick={prevStep}
                         disabled={currentStep === 1}
                         class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -1079,7 +1088,7 @@
                     <div class="flex items-center space-x-2">
                         {#if currentStep < 4}
                             <button
-                                on:click={nextStep}
+                                onclick={nextStep}
                                 disabled={currentStep === 1 && !canProceedStep1 || currentStep === 2 && !canProceedStep2 || currentStep === 3 && !canProceedStep3}
                                 class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-[#E76A23] text-white hover:bg-[#d15e1e] focus:outline-none focus:ring-2 focus:ring-[#E76A23] focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -1088,7 +1097,7 @@
                             </button>
                         {:else}
                             <button
-                                on:click={handleStart}
+                                onclick={handleStart}
                                 disabled={startingSystem}
                                 class="inline-flex items-center px-6 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >

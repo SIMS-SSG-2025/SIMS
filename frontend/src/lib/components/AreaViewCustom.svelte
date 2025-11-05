@@ -3,7 +3,6 @@
     import { fetchObjectPositions, type ObjectPosition, type Zone } from '$lib/api/config';
     import MovementTrails from './MovementTrails.svelte';
 
-    // Props
     let {
         locationId,
         zones = [],
@@ -24,9 +23,6 @@
     let imageWidth = $state(1920);
     let imageHeight = $state(1080);
     let movementTrailComponent = $state<any>(null);
-
-    // Computed
-    let positionCount = $derived(positions.length);
 
     onMount(() => {
         img = new Image();

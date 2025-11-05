@@ -1,25 +1,18 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
+    import { onDestroy } from 'svelte';
     import { Chart, Title, Tooltip, Legend, BarElement, LineElement, PointElement, CategoryScale, LinearScale, BarController, LineController, Filler } from 'chart.js';
     import { X, ChartColumn, ChartLine } from 'lucide-svelte';
     import type { TimeRangeOption, TimeRange } from '$lib/api/stats';
     import {
         calculateTimeRange,
-        getMockChartModalData,
         fetchEventsForLocation,
         createChartDataFromEvents,
-        calculatePPEComplianceFromEvents,
         findEarliestEventTime,
         type Event
     } from '$lib/api/stats';
     import { chartPreferences } from '$lib/stores/chartPreferences';
     import DateRangePicker from './DateRangePicker.svelte';
 
-    // ============================================
-    // DATA SOURCE CONFIGURATION
-    // ============================================
-    // Set this to false to use mock data for charts
-    const USE_REAL_DATA = true;
 
     Chart.register(
         Title, Tooltip, Legend,
@@ -45,7 +38,7 @@
         locationId
     }: ChartModalProps = $props();
 
-    // Auto-subscribe to global store using Svelte 5 rune
+    // Auto-subscribe to global store
     let preferences = $derived($chartPreferences);
 
     // Local state synced with store
@@ -94,9 +87,20 @@
     }
     let eventCache = $state<EventCache | null>(null);
 
+    // Cache expiration time (5 minutes)
+    const CACHE_EXPIRATION_MS = 5 * 60 * 1000;
+
     // Check if cached data is still valid for the requested time range
     function isCacheValid(locId: number, requestedRange: TimeRange): boolean {
         if (!eventCache || eventCache.locationId !== locId) {
+            return false;
+        }
+
+        // Check if cache has expired
+        const now = new Date().getTime();
+        const cacheAge = now - eventCache.fetchTime.getTime();
+        if (cacheAge > CACHE_EXPIRATION_MS) {
+            console.log('⏰ ChartModal: Cache expired, will fetch fresh data');
             return false;
         }
 
@@ -171,13 +175,12 @@
         loading = true;
         try {
             // If "all" range is selected and we don't have earliest time yet, fetch it first
-            if (selectedRange === 'all' && !earliestEventTime && USE_REAL_DATA && locationId) {
+            if (selectedRange === 'all' && !earliestEventTime && locationId) {
                 // Fetch with fallback range to get all events
                 const fallbackRange = calculateTimeRange('all', undefined);
                 const allEventsResponse = await fetchEventsForLocation(locationId, fallbackRange);
                 if (allEventsResponse.events.length > 0) {
                     earliestEventTime = findEarliestEventTime(allEventsResponse.events);
-                    console.log(`📅 ChartModal: Found earliest event: ${earliestEventTime?.toISOString()}`);
                 }
             }
 
@@ -189,25 +192,20 @@
                 end: new Date(timeRange.end)
             };
 
-            if (USE_REAL_DATA && locationId) {
-                // ============================================
-                // REAL DATA FROM API
-                // ============================================
+            if (locationId) {
                 let events: Event[];
+                let usedCache = false;
 
                 // Check if we can use cached data
                 if (isCacheValid(locationId, plainTimeRange)) {
-                    console.log('📦 ChartModal: Using cached events');
                     events = filterCachedEvents(plainTimeRange);
+                    usedCache = true;
                 } else {
                     // Fetch fresh events from API
                     const eventsResponse = await fetchEventsForLocation(locationId, plainTimeRange);
                     events = eventsResponse.events;
 
-                    console.log(`✅ ChartModal: Fetched ${events.length} events from API`);
-
                     // Update cache with broader time range for day/week views
-                    let cacheTimeRange = plainTimeRange;
                     if (selectedRange === 'day' || selectedRange === 'week') {
                         // Cache a month's worth of data when viewing day or week
                         const cacheStart = new Date(plainTimeRange.start);
@@ -218,7 +216,7 @@
                         cacheEnd.setDate(0); // Last day of month
                         cacheEnd.setHours(23, 59, 59, 999);
 
-                        // If we need to fetch broader data
+                        // If we need to fetch broader data for better caching
                         if (cacheStart.getTime() < plainTimeRange.start.getTime() ||
                             cacheEnd.getTime() > plainTimeRange.end.getTime()) {
                             const broadResponse = await fetchEventsForLocation(locationId, {
@@ -231,7 +229,6 @@
                                 fetchTime: new Date(),
                                 timeRange: { start: cacheStart, end: cacheEnd }
                             };
-                            console.log(`📦 ChartModal: Cached ${broadResponse.events.length} events for month range`);
                             // Filter to requested range
                             events = filterCachedEvents(plainTimeRange);
                         } else {
@@ -253,7 +250,8 @@
                     }
                 }
 
-                // Transform events into chart data
+
+                // Transform events into chart data (always creates valid structure even with 0 events)
                 const chartData = createChartDataFromEvents(events, plainTimeRange);
 
                 // Generate proper labels from timestamps
@@ -295,34 +293,17 @@
                 vehiclesData = [...chartData.vehicles.map(point => point.value)];
                 ppeBreachesData = [...chartData.ppeBreaches.map(point => point.value)];
                 zoneEntriesData = [...chartData.zoneEntries.map(point => point.value)];
-            } else {
-                // ============================================
-                // MOCK DATA (Fallback or when USE_REAL_DATA = false)
-                // ============================================
-                const mockData = getMockChartModalData(plainTimeRange);
-
-                chartLabels = [...mockData.labels];
-                personsData = [...mockData.persons];
-                vehiclesData = [...mockData.vehicles];
-                ppeBreachesData = [...mockData.ppeBreaches];
-                zoneEntriesData = [...mockData.zoneEntries];
             }
 
             updateChart();
         } catch (error) {
             console.error('Error loading chart data:', error);
-            // Fallback to mock data on error
-            const timeRange = calculateTimeRange(selectedRange, customTimeRange || undefined);
-            const plainTimeRange = {
-                start: new Date(timeRange.start),
-                end: new Date(timeRange.end)
-            };
-            const mockData = getMockChartModalData(plainTimeRange);
-            chartLabels = [...mockData.labels];
-            personsData = [...mockData.persons];
-            vehiclesData = [...mockData.vehicles];
-            ppeBreachesData = [...mockData.ppeBreaches];
-            zoneEntriesData = [...mockData.zoneEntries];
+            // Clear chart data on error
+            chartLabels = [];
+            personsData = [];
+            vehiclesData = [];
+            ppeBreachesData = [];
+            zoneEntriesData = [];
             updateChart();
         } finally {
             loading = false;
@@ -550,7 +531,6 @@
         // 3. We've tracked a previous type
         // 4. Type actually changed
         if (chart && open && prevChartType !== null && prevChartType !== type) {
-            console.log(`🔄 ChartModal: Chart type changed from ${prevChartType} to ${type}`);
             prevChartType = type;
 
             // Destroy old chart
@@ -565,7 +545,6 @@
         } else if (!prevChartType && chart) {
             // Initialize tracking after first chart creation
             prevChartType = type;
-            console.log(`📊 ChartModal: Initial chart type set to ${type}`);
         }
     });
 

@@ -25,7 +25,7 @@
     // Generate distinct colors for different objects
     const objectColors: Map<number, string> = new Map();
     const colorPalette = [
-        'rgba(231, 106, 35, ',   // Orange (SIMS primary)
+        'rgba(231, 106, 35, ',   // Orange
         'rgba(59, 130, 246, ',    // Blue
         'rgba(34, 197, 94, ',     // Green
         'rgba(168, 85, 247, ',    // Purple

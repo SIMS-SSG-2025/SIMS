@@ -84,18 +84,6 @@ export async function fetchConfigByLocation(locationId: number): Promise<Config 
     }
 }
 
-export async function deleteCurrentConfig(): Promise<boolean> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/config/current`, {
-            method: "DELETE"
-        });
-        return response.ok;
-    } catch (error) {
-        console.error("Error deleting config:", error);
-        return false;
-    }
-}
-
 export async function deleteLocationConfig(locationId: number): Promise<boolean> {
     try {
         const response = await fetch(`${API_BASE_URL}/config/location/${locationId}`, {
