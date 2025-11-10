@@ -1,3 +1,9 @@
+"""
+Model export utility for ONNX and TensorRT conversion.
+Converts trained PyTorch YOLO models to ONNX format and builds optimized
+TensorRT engines for deployment. Supports FP16 precision for faster inference.
+"""
+
 import argparse
 import torch
 import yaml
@@ -55,7 +61,3 @@ if __name__ == '__main__':
 
 
 # usage: .\utils\convert_model.py --weights_path models/yolo_ppe.pth --config models/yolo11_ppe_cfg.yaml --onnx_path models/yolo_ppe.onnx --trt_path yolo_ppe.trt --build_trt --fp16
-
-
-
-

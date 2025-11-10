@@ -1,3 +1,8 @@
+"""
+Centralized logging utility creating and configuring loggers with both file and console
+handlers. Logs are written to device/logs/ directory with standardized formatting and timestamps.
+"""
+
 import logging
 from pathlib import Path
 

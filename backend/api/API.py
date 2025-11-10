@@ -1,3 +1,9 @@
+"""
+FastAPI REST API server providing endpoints for configuration management, event querying,
+system control, and camera snapshot retrieval. Serves as the communication layer between
+the frontend dashboard and the device runtime/database.
+"""
+
 import os
 from fastapi import FastAPI, Query
 from pydantic import BaseModel

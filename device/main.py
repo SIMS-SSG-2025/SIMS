@@ -1,3 +1,9 @@
+"""
+Entry point for the device runtime. Initializes the database worker thread and
+DeviceRuntime instance, then enters the main loop that checks system status and
+controls AI processing. Handles graceful shutdown and thread cleanup.
+"""
+
 import cv2
 from ultralytics import YOLO
 import time

@@ -1,3 +1,10 @@
+"""
+Database worker thread for thread-safe database operations.
+Processes database messages from a queue, handling inserts for objects, events,
+zones, and positions. Provides status checks and configuration updates via
+response queues to avoid blocking the main AI processing thread.
+"""
+
 import sqlite3
 import queue
 from backend.db.database_manager import DatabaseManager

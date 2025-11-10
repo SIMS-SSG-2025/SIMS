@@ -1,3 +1,9 @@
+"""
+YOLO model inference utilities for object detection.
+Provides functions to run YOLO inference on video frames and regions of interest (ROI).
+Returns detection results in a standardized format for tracking and event processing.
+"""
+
 import cv2
 
 from device.utils.logger import get_logger

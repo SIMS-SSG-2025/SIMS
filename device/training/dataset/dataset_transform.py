@@ -1,3 +1,10 @@
+"""
+Dataset configuration utilities for YOLO training.
+Loads class mappings and dataset information from YAML configuration files.
+Provides functions to extract class names, paths, and other dataset metadata
+used throughout the training pipeline.
+"""
+
 import yaml
 import os
 
@@ -131,4 +138,3 @@ if __name__ == '__main__':
     # cls_to_remove = ['Mask', 'NO-Mask', 'Safety Cone', 'machinery']
     cls_to_remove = ['gloves', 'boots', 'goggles', 'no_goggle', 'no_gloves', 'no_boots']
     #remove_annotations("ppe-dataset", cls_names, cls_to_remove)
-

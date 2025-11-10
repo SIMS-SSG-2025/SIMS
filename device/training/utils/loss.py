@@ -1,3 +1,10 @@
+"""
+Custom detection loss function for YOLO training.
+Extends Ultralytics v8DetectionLoss with custom loss computation for training
+person detection and PPE classification models. Uses task-aligned assigner
+for matching predictions to ground truth bounding boxes.
+"""
+
 import torch
 from ultralytics.utils.loss import BboxLoss, TaskAlignedAssigner
 from ultralytics.utils.loss import v8DetectionLoss

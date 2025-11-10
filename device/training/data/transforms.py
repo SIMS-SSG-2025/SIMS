@@ -1,3 +1,10 @@
+"""
+Image transformation utilities for YOLO training.
+Provides letterbox resizing that maintains aspect ratio with padding, used for
+preprocessing images before training and inference. Handles bounding box coordinate
+transformations to match resized image dimensions.
+"""
+
 import math
 import cv2
 

@@ -1,3 +1,10 @@
+"""
+Object tracking implementation using BOTSORT algorithm.
+Tracks detected objects across video frames, maintaining unique track IDs for
+each object. Provides detection result formatting and Re-ID engine integration
+for robust multi-object tracking.
+"""
+
 from types import SimpleNamespace
 from ultralytics.trackers.bot_sort import BOTSORT
 import numpy as np
@@ -128,4 +135,3 @@ class Tracker:
 
     def set_track_id(self,track_id):
         BaseTrack._count = track_id
-
