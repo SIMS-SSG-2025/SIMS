@@ -1,10 +1,19 @@
 
 <script lang="ts">
 		import { X } from 'lucide-svelte';
+		import type { Snippet } from 'svelte';
 
-		export let open: boolean = false;
-		export let onClose: () => void = () => {};
-		export let modalClass: string = "";
+		let {
+			open = $bindable(false),
+			onClose = () => {},
+			modalClass = "",
+			children
+		}: {
+			open: boolean;
+			onClose: () => void;
+			modalClass?: string;
+			children: Snippet;
+		} = $props();
 </script>
 
 {#if open}
@@ -15,19 +24,19 @@
 			role="button"
 			tabindex="0"
 			aria-label="Close modal background"
-			on:click={onClose}
-			on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onClose(); } }}
+			onclick={onClose}
+			onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onClose(); } }}
 		></div>
 		<!-- Modal content -->
 		<div class={`relative bg-white rounded-2xl shadow-2xl z-10 border border-gray-200 flex flex-col items-center overflow-hidden ${modalClass}`}>
 			<button
 				class="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 text-gray-500 z-10"
-				on:click={onClose}
+				onclick={onClose}
 				aria-label="Close"
 			>
 				<X class="h-6 w-6" />
 			</button>
-			<slot />
+			{@render children()}
 		</div>
 	</div>
 {/if}
