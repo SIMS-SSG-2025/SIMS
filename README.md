@@ -19,6 +19,40 @@ The system consists of three main components:
 
 The frontend communicates with the backend API over the network using the Jetson's IP address.
 
+### Detection Model
+
+YOLO11s: https://github.com/ultralytics/ultralytics
+License: https://www.gnu.org/licenses/agpl-3.0.en.html
+
+Modifications: Fine-tuned on custom datasets.
+
+### Datasets
+
+**Helmet + Vest:**
+
+Huang, Mei-Ling; Cheng, Ying (2025), “Dataset of Personal Protective Equipment (PPE)”, Mendeley Data, V6, doi: 10.17632/zkzghjvpn2.6
+https://data.mendeley.com/datasets/zkzghjvpn2/6
+
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Modifications: Removed negative class labels; NO-Helmet, NO-Vest
+
+**Helmet only:**
+
+Safety Helmet Dataset
+https://universe.roboflow.com/workplace-rchqz/safety-helmet-dataset-ueg5o
+
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Modifications: Removed class labels; head, person.
+
+**Person only:**
+
+Person Computer Vision Dataset
+https://universe.roboflow.com/vnpt-wm4cs/person-2ktoq
+
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
 ## Prerequisites
 
 ## Quick Start
@@ -98,40 +132,40 @@ detections = run_inference(rgb_frame, self.model, conf=0.25, iou=0.5)
 
 Edit `device/inference/tracker.py` to tune tracking behavior:
 
-```python
-args = SimpleNamespace(
-    track_buffer=300,           # Frames to keep lost tracks (30s at 10fps)
-    track_high_thresh=0.7,      # High confidence threshold for track confirmation
-    track_low_thresh=0.05,      # Low confidence threshold (tracks below are removed)
-    new_track_thresh=0.8,       # Confidence threshold to start new track
-    match_thresh=0.5,           # Matching threshold for data association
-    fuse_score=True,            # Fuse detection and tracking scores
-    proximity_thresh=0.35,      # Distance threshold for association (ReID)
-    appearance_thresh=0.2,      # Appearance similarity threshold (ReID)
-)
-```
 
 **Important Tracker Parameters:**
 
-1. **`track_buffer`**: How long to remember lost tracks (in frames)
-   - Increase if objects frequently leave and re-enter frame
-   - Default 300 frames ≈ 30 seconds at 10fps
+1. **`track_buffer`**: For how long time in frames the system will remember a track until it is removed.
+   - ↑ Can recover objects from longer occlusions.
+   - ↓ Smaller buffer and faster clean up. Can result in losing tracks during occlusions.
 
-2. **`track_high_thresh`**: Confidence required to activate a track
-   - Higher = more stable tracks but may miss objects
-   - Recommended: 0.6-0.8
+2. **`track_high_thresh`**: Threshold of detection confidence in order to be associated/matched with existing tracks.
+   - ↑ More robust to false matches but can miss matches of lower confidence objects that for instance are occluded.
+   - ↓ Allows more detections for matching with existing objects. Fewer lost tracks but can result in an increased number of ID switches. 
 
-3. **`new_track_thresh`**: Confidence required to start new track
-   - Higher = fewer false positive tracks
-   - Recommended: 0.7-0.9
+3. **`new_track_thresh`**: Threshold of detection confidence in order for the tracker to create a new track.
+   - ↑ More robust to creating tracks from false detections. Can delay the number of frames until a new track is created.
+   - ↓ Faster creations of new track but can increase risks of false positives and ID switches.
 
-4. **`proximity_thresh`**: Maximum distance for matching (with ReID)
-   - Increase for fast-moving objects
-   - Decrease for static scenes
+4. **`track_low_thresh`**: Minimum detection confidence to be used in association with unmatched tracks.
+   - ↑ Reduces the number of false positives but may miss to recover tracks that for instance are occluded.
+   - ↓ Can help to recover heavily occluded objects but could also cause false matches.
+   
+5. **`appearance_thresh`**: Threshold in appearance similarity of tracks inbetween frames.
+   - ↑ Stricter visual similarity in order to match objects inbetween frames, can fail to recover occluded or changed objects. 
+   - ↓ Looser visual similarity but may result in an increase of ID switches of similar-looking objects.
+   
+6. **`proximity_thresh`**: Threshold for spatial matching of tracks between frames.
+   - ↑ Stricter spatial matching, reduces the number of wrong matches but could drop occluded or fast-moving objects.
+   - ↓ More robust to various motions such as inconsistent movement.
 
-5. **`appearance_thresh`**: ReID similarity threshold
-   - Lower = stricter appearance matching
-   - Higher = more lenient matching
+7. **`match_thresh`**: Combines proximity_thresh and appearance_thresh to confirm a match.
+   - ↑ Stricter matching, fewer false positives but may miss lower confident matches.
+   - ↓ Looser matching, better continuity at keeping matches but more prone to ID switches.
+
+8. **`frame_age_threshold`**: Minimum number of frames until a track is being considered confirmed/alive.
+   - ↑ More robust to false tracks but takes longer time to be confirmed.
+   - ↓ Faster confirmation of new tracks, but may confirm false tracks. 
 
 ### Frame Sampling
 
