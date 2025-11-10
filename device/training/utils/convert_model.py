@@ -11,4 +11,3 @@ model = YOLO(MODEL_PATH)
 model.export(format="engine", half=True, dynamic=True, device=0) # PPE
 # model.export(format="engine", half=True, dynamic=True, batch=8, device=0) # ReID
 # model.export(format="engine", half=True, device=0) # Person
-

@@ -1,3 +1,9 @@
+"""
+Database initialization script that creates the SQLite database schema including tables
+for events, zones, objects, locations, system configuration, and object positions.
+Run once to initialize the database before starting the system.
+"""
+
 import sqlite3
 import datetime
 import os

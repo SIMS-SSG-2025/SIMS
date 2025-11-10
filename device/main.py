@@ -1,3 +1,9 @@
+"""
+Entry point for the device runtime. Initializes the database worker thread and
+DeviceRuntime instance, then enters the main loop that checks system status and
+controls AI processing. Handles graceful shutdown and thread cleanup.
+"""
+
 import time
 import threading, queue
 from .utils.logger import get_logger
@@ -46,5 +52,3 @@ if __name__ == "__main__":
     device_runtime.stop()
     stop_event.set()
     db_thread.join()
-
-

@@ -1,3 +1,9 @@
+"""
+Main device runtime managing the edge AI processing pipeline including camera capture,
+YOLO model inference, object tracking, PPE detection, and event generation. Runs in the
+main thread and communicates with the database worker thread via queue-based messaging.
+"""
+
 import cv2
 from ultralytics import YOLO
 import time
@@ -196,4 +202,3 @@ class DeviceRuntime:
 
         except queue.Empty:
             print("No objects fetched.")
-

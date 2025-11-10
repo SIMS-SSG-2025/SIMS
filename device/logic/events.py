@@ -1,3 +1,10 @@
+"""
+Event management and safety violation detection logic.
+Handles zone intrusion detection, PPE (helmet/vest) classification, and event
+generation. Manages object tracking state, zone entry/exit timing, and communicates
+safety events to the database via message queue.
+"""
+
 import datetime
 from ultralytics import YOLO
 from shapely.geometry import Point, Polygon

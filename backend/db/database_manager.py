@@ -1,3 +1,9 @@
+"""
+SQLite database manager handling all database operations including inserting objects,
+events, zones, and object positions. Provides thread-safe database access using local
+cursors per method to avoid race conditions.
+"""
+
 import sqlite3
 import json
 

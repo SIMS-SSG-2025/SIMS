@@ -1,3 +1,9 @@
+"""
+Custom PyTorch dataset for safety monitoring object detection.
+Loads images and YOLO-format labels for training. Applies letterbox resizing
+and data transformations. Used for training person/vehicle and PPE detection models.
+"""
+
 import os
 import torch
 from torch.utils.data import Dataset

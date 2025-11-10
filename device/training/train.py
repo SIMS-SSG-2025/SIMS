@@ -1,3 +1,10 @@
+"""
+YOLO model training script for person and PPE detection.
+Trains custom YOLO models using PyTorch with custom loss functions and data
+augmentation. Supports both person/vehicle detection and PPE classification models.
+Configured via YAML files and uses TensorBoard for monitoring training progress.
+"""
+
 import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
