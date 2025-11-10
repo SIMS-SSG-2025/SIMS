@@ -605,7 +605,7 @@
         </div>
 
         <!-- Center: Tab Navigation -->
-        <div class="flex gap-1 bg-white p-0.5 lg:p-1 rounded-lg shadow-sm">
+        <div class="flex gap-1 bg-white p-0.5 lg:p-1 rounded-lg shadow-sm mr-4">
             <button
                 class="px-3 lg:px-4 py-1 lg:py-1.5 rounded-md font-semibold transition text-xs lg:text-sm
                     {activeTab === 'dashboard'
@@ -652,9 +652,6 @@
                     <span class="text-xs lg:text-sm font-medium text-green-900">{config.locationName}</span>
                 </button>
             {/if}
-            <button class="p-1.5 lg:p-2 rounded-full hover:bg-gray-100 transition" aria-label="Export">
-                <Download size={20} class="lg:w-6 lg:h-6 text-gray-600" />
-            </button>
             <button class="p-1.5 lg:p-2 rounded-full hover:bg-gray-100 transition" aria-label="Settings" onclick={openSettingsModal}>
                 <Settings size={20} class="lg:w-6 lg:h-6 text-gray-600" />
             </button>
